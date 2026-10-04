@@ -105,6 +105,7 @@ def _write_benchmark_manifest(path: Path) -> None:
                 "safe": "jaw--original--safe",
                 "rejected": "jaw--original--rejected",
             },
+            "selection": {"target_fixture": "jaw", "variant": "original"},
             "expected": {
                 "safe": {"status": "completed", "accepted_actions": 49},
                 "rejected": {"status": "rejected", "accepted_actions": 0},
@@ -142,6 +143,17 @@ class H3cArtifactConsumerTests(unittest.TestCase):
         self.assertEqual(result["cells"]["safe"]["summary"], _safe_summary())
         self.assertEqual(result["cells"]["rejected"]["summary"], _rejected_summary())
         self.assertEqual(result["source"]["commit"], SOURCE_COMMIT)
+
+    def test_sibling_private_directory_is_not_consumed(self) -> None:
+        secret = self.matrix / "jaw--original--safe" / "private" / "secret.json"
+        _write_json(secret, {"known_continuation": "must remain unreachable"})
+
+        result = consume_golden_pair(
+            matrix_root=self.matrix,
+            benchmark_manifest_path=self.manifest,
+            source_commit=SOURCE_COMMIT,
+        )
+        self.assertTrue(result["passed"])
 
     def test_wrong_source_commit_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "source commit mismatch"):
