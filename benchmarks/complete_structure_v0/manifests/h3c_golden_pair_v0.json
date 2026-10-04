@@ -21,5 +21,9 @@
       "status": "rejected",
       "accepted_actions": 0
     }
+  },
+  "selection": {
+    "target_fixture": "jaw",
+    "variant": "original"
   }
 }
