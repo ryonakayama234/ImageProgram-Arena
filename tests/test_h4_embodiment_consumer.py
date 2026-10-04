@@ -9,7 +9,7 @@ from adapters.imageprogram_reference.consume_h4 import (
     validate_public_bundle,
 )
 
-SOURCE_COMMIT = "c206bb422953b624acc982f07931416e5a992a0a"
+SOURCE_COMMIT = "397869fe958325e7d60bf8f80ec37e7bbf764bdc"
 
 
 def _hash(path: Path) -> str:
