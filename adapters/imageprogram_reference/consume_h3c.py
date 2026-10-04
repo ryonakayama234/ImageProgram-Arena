@@ -63,6 +63,7 @@ def validate_public_bundle(public_dir: Path) -> tuple[dict[str, Any], dict[str, 
     if not isinstance(public_files, dict) or not public_files:
         raise ValueError("public manifest must declare a non-empty public_files mapping")
 
+    public_root = public_dir.resolve()
     declared: set[str] = set()
     for name, expected_hash in public_files.items():
         if not isinstance(name, str) or not isinstance(expected_hash, str):
@@ -70,8 +71,12 @@ def validate_public_bundle(public_dir: Path) -> tuple[dict[str, Any], dict[str, 
         relative = _safe_relative_path(name)
         declared.add(relative.as_posix())
         path = public_dir / relative
-        if not path.is_file():
-            raise ValueError(f"declared public artifact is missing: {name}")
+        if (
+            not path.resolve().is_relative_to(public_root)
+            or path.is_symlink()
+            or not path.is_file()
+        ):
+            raise ValueError(f"invalid public artifact path: {name}")
         actual_hash = file_hash(path)
         if actual_hash != expected_hash:
             raise ValueError(
@@ -88,7 +93,7 @@ def validate_public_bundle(public_dir: Path) -> tuple[dict[str, Any], dict[str, 
     actual = {
         path.relative_to(public_dir).as_posix()
         for path in public_dir.rglob("*")
-        if path.is_file() and path.name != "manifest.json"
+        if path.is_file() and path.relative_to(public_dir) != Path("manifest.json")
     }
     if actual != declared:
         missing = sorted(declared - actual)
