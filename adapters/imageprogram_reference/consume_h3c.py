@@ -118,12 +118,19 @@ def _summary_checks(
     benchmark_manifest: dict[str, Any],
 ) -> dict[str, bool]:
     expected = benchmark_manifest["expected"]
+    selection = benchmark_manifest["selection"]
     safe_expected = expected["safe"]
     rejected_expected = expected["rejected"]
 
     checks = {
-        "same_target_fixture": safe.get("target_fixture") == rejected.get("target_fixture"),
-        "same_variant": safe.get("variant") == rejected.get("variant") == "original",
+        "selected_target_fixture": (
+            safe.get("target_fixture")
+            == rejected.get("target_fixture")
+            == selection["target_fixture"]
+        ),
+        "selected_variant": (
+            safe.get("variant") == rejected.get("variant") == selection["variant"]
+        ),
         "same_initial_state": safe.get("initial_state_hash") == rejected.get("initial_state_hash"),
         "safe_case": safe.get("case") == "safe",
         "safe_completed": safe.get("status") == safe_expected["status"],
@@ -132,6 +139,7 @@ def _summary_checks(
         "safe_endpoint": safe.get("endpoint_error_m") == 0.0,
         "safe_protection": safe.get("protection_added_ink") == 0.0,
         "safe_replay": safe.get("replay_verified") is True,
+        "safe_deterministic_replay": safe.get("replay_kind") == "deterministic_execution",
         "safe_private_access_zero": safe.get("policy_private_data_access") == 0,
         "safe_costs_separate": (
             isinstance(safe.get("preparation_cost"), dict)
