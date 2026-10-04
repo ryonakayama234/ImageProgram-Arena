@@ -1,0 +1,29 @@
+{
+  "format": "imageprogram-arena-h3c-golden-pair-manifest-1",
+  "benchmark": "complete_structure_v0",
+  "lineage_id": "character-bust-v0/jaw/original",
+  "split": "foundation_control",
+  "source": {
+    "repository": "ryonakayama234/ImageProgram",
+    "commit": "824cbefc14e3e1e4978f10fd687a0c80fb200f4d",
+    "artifact_format": "imageprogram-h3c-public-1"
+  },
+  "cells": {
+    "safe": "jaw--original--safe",
+    "rejected": "jaw--original--rejected"
+  },
+  "expected": {
+    "safe": {
+      "status": "completed",
+      "accepted_actions": 49
+    },
+    "rejected": {
+      "status": "rejected",
+      "accepted_actions": 0
+    }
+  },
+  "selection": {
+    "target_fixture": "jaw",
+    "variant": "original"
+  }
+}
