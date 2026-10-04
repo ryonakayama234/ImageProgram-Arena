@@ -5,7 +5,7 @@
   "split": "h4_phase1_control",
   "source": {
     "repository": "ryonakayama234/ImageProgram",
-    "commit": "c206bb422953b624acc982f07931416e5a992a0a",
+    "commit": "397869fe958325e7d60bf8f80ec37e7bbf764bdc",
     "artifact_format": "imageprogram-h4-body-public-1"
   },
   "cells": {
