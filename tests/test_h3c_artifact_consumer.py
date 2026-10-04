@@ -179,6 +179,19 @@ class H3cArtifactConsumerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "non-public artifact path"):
             validate_public_bundle(public_dir)
 
+    def test_symlinked_public_file_is_rejected(self) -> None:
+        public_dir = self.matrix / "jaw--original--safe" / "public"
+        outside = self.root / "outside.json"
+        _write_json(outside, {"value": 1})
+        link = public_dir / "linked.json"
+        link.symlink_to(outside)
+        manifest = json.loads((public_dir / "manifest.json").read_text(encoding="utf-8"))
+        manifest["public_files"]["linked.json"] = _hash(outside)
+        _write_json(public_dir / "manifest.json", manifest)
+
+        with self.assertRaisesRegex(ValueError, "invalid public artifact path"):
+            validate_public_bundle(public_dir)
+
     def test_rejected_nonzero_continuation_fails_pair_gate(self) -> None:
         public_dir = self.matrix / "jaw--original--rejected" / "public"
         summary = _rejected_summary()
