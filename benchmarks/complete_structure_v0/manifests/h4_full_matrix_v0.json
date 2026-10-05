@@ -1,0 +1,164 @@
+{
+  "format": "imageprogram-arena-h4-matrix-manifest-1",
+  "benchmark": "complete_structure_v0",
+  "split": "h4_full_matrix",
+  "source": {
+    "repository": "ryonakayama234/ImageProgram",
+    "commit": "1cbc861641f5948347d885f8a781cd3fe8e314e7",
+    "artifact_format": "imageprogram-h4-matrix-body-public-1"
+  },
+  "lineages": [
+    {
+      "lineage_id": "character-bust-v0/jaw/original/safe/h4-embodiment",
+      "folder": "jaw-original-safe",
+      "target_fixture": "jaw",
+      "variant": "original",
+      "case": "safe",
+      "expected": {
+        "body_a": {
+          "accepted_actions": 49,
+          "sim_time_s": 4.264503592,
+          "sim_time_tolerance_s": 0.000001
+        },
+        "body_b": {
+          "accepted_actions": 90,
+          "sim_time_s": 8.519007184,
+          "sim_time_tolerance_s": 0.000001
+        }
+      }
+    },
+    {
+      "lineage_id": "character-bust-v0/jaw/affine_x_plus_0_10/safe/h4-embodiment",
+      "folder": "jaw-affine_x_plus_0_10-safe",
+      "target_fixture": "jaw",
+      "variant": "affine_x_plus_0_10",
+      "case": "safe",
+      "expected": {
+        "body_a": {
+          "accepted_actions": 45,
+          "sim_time_s": 3.843093389,
+          "sim_time_tolerance_s": 0.000001
+        },
+        "body_b": {
+          "accepted_actions": 82,
+          "sim_time_s": 7.676186779,
+          "sim_time_tolerance_s": 0.000001
+        }
+      }
+    },
+    {
+      "lineage_id": "character-bust-v0/hair/original/safe/h4-embodiment",
+      "folder": "hair-original-safe",
+      "target_fixture": "hair",
+      "variant": "original",
+      "case": "safe",
+      "expected": {
+        "body_a": {
+          "accepted_actions": 39,
+          "sim_time_s": 3.662863535,
+          "sim_time_tolerance_s": 0.000001
+        },
+        "body_b": {
+          "accepted_actions": 76,
+          "sim_time_s": 7.31572707,
+          "sim_time_tolerance_s": 0.000001
+        }
+      }
+    },
+    {
+      "lineage_id": "character-bust-v0/hair/affine_x_plus_0_10/safe/h4-embodiment",
+      "folder": "hair-affine_x_plus_0_10-safe",
+      "target_fixture": "hair",
+      "variant": "affine_x_plus_0_10",
+      "case": "safe",
+      "expected": {
+        "body_a": {
+          "accepted_actions": 39,
+          "sim_time_s": 3.587420432,
+          "sim_time_tolerance_s": 0.000001
+        },
+        "body_b": {
+          "accepted_actions": 75,
+          "sim_time_s": 7.164840864,
+          "sim_time_tolerance_s": 0.000001
+        }
+      }
+    },
+    {
+      "lineage_id": "character-bust-v0/neck_shoulders/original/safe/h4-embodiment",
+      "folder": "neck_shoulders-original-safe",
+      "target_fixture": "neck_shoulders",
+      "variant": "original",
+      "case": "safe",
+      "expected": {
+        "body_a": {
+          "accepted_actions": 103,
+          "sim_time_s": 9.273600504,
+          "sim_time_tolerance_s": 0.000001
+        },
+        "body_b": {
+          "accepted_actions": 194,
+          "sim_time_s": 18.517201009,
+          "sim_time_tolerance_s": 0.000001
+        }
+      }
+    },
+    {
+      "lineage_id": "character-bust-v0/neck_shoulders/affine_x_plus_0_10/safe/h4-embodiment",
+      "folder": "neck_shoulders-affine_x_plus_0_10-safe",
+      "target_fixture": "neck_shoulders",
+      "variant": "affine_x_plus_0_10",
+      "case": "safe",
+      "expected": {
+        "body_a": {
+          "accepted_actions": 98,
+          "sim_time_s": 8.837852166,
+          "sim_time_tolerance_s": 0.000001
+        },
+        "body_b": {
+          "accepted_actions": 185,
+          "sim_time_s": 17.645704332,
+          "sim_time_tolerance_s": 0.000001
+        }
+      }
+    },
+    {
+      "lineage_id": "character-bust-v0/jaw/original/rejected/h4-embodiment",
+      "folder": "jaw-original-rejected",
+      "target_fixture": "jaw",
+      "variant": "original",
+      "case": "rejected",
+      "expected": {
+        "body_a": {
+          "accepted_actions": 0,
+          "sim_time_s": 0,
+          "sim_time_tolerance_s": 0.000001
+        },
+        "body_b": {
+          "accepted_actions": 0,
+          "sim_time_s": 0,
+          "sim_time_tolerance_s": 0.000001
+        }
+      }
+    },
+    {
+      "lineage_id": "character-bust-v0/neck_shoulders/original/rejected/h4-embodiment",
+      "folder": "neck_shoulders-original-rejected",
+      "target_fixture": "neck_shoulders",
+      "variant": "original",
+      "case": "rejected",
+      "expected": {
+        "body_a": {
+          "accepted_actions": 0,
+          "sim_time_s": 0,
+          "sim_time_tolerance_s": 0.000001
+        },
+        "body_b": {
+          "accepted_actions": 0,
+          "sim_time_s": 0,
+          "sim_time_tolerance_s": 0.000001
+        }
+      }
+    }
+  ]
+}
