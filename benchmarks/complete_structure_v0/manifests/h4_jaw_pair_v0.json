@@ -1,0 +1,27 @@
+{
+  "format": "imageprogram-arena-h4-pair-manifest-1",
+  "benchmark": "complete_structure_v0",
+  "lineage_id": "character-bust-v0/jaw/original/h4-embodiment",
+  "split": "h4_phase1_control",
+  "source": {
+    "repository": "ryonakayama234/ImageProgram",
+    "commit": "2210c4a1b0f0341d834632208a2fae1ffedff0a2",
+    "artifact_format": "imageprogram-h4-body-public-1"
+  },
+  "cells": {
+    "body_a": "body-a",
+    "body_b": "body-b"
+  },
+  "expected": {
+    "body_a": {
+      "accepted_actions": 49,
+      "sim_time_s": 4.264503592,
+      "sim_time_tolerance_s": 0.000001
+    },
+    "body_b": {
+      "accepted_actions": 90,
+      "sim_time_s": 8.519007184,
+      "sim_time_tolerance_s": 0.000001
+    }
+  }
+}
