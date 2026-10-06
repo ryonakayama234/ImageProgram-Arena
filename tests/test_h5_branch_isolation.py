@@ -158,6 +158,47 @@ class FakeAdapter:
 
 
 class H5BranchIsolationTests(unittest.TestCase):
+    def test_non_json_candidate_types_are_rejected_before_callbacks(self):
+        class CustomInt(int):
+            pass
+
+        for value in ([(1, 2)], {1: "value"}, float("nan"), float("inf"), CustomInt(1)):
+            with self.subTest(value=value):
+                candidates = _candidates()
+                candidates[-1]["public_payload"]["extra"] = value
+                adapter = FakeAdapter()
+                with self.assertRaisesRegex(BranchIsolationError, "JSON"):
+                    candidate_manifest_hash(candidates)
+                with self.assertRaisesRegex(BranchIsolationError, "JSON"):
+                    run_exhaustive_branches(
+                        spec=_spec(), checkpoint=adapter.checkpoint,
+                        candidates=candidates, restore_checkpoint=adapter.restore,
+                        restored_state_hash=adapter.state_hash,
+                        execute_candidate=adapter.execute,
+                    )
+                self.assertEqual(adapter.restore_calls, 0)
+                self.assertEqual(adapter.execute_calls, 0)
+
+    def test_json_native_candidate_values_are_preserved_for_execution(self):
+        candidates = _candidates()
+        values = {"points": [[1, 2]], "flag": True, "none": None, "value": 0.5}
+        candidates[0]["public_payload"].update(values)
+        adapter = FakeAdapter()
+
+        def check_types(state, candidate, policy_input):
+            if candidate["candidate_id"] == "A":
+                self.assertEqual(candidate["public_payload"]["points"], [[1, 2]])
+                self.assertIs(type(candidate["public_payload"]["points"][0]), list)
+                self.assertIs(type(candidate["public_payload"]["flag"]), bool)
+            return adapter.execute(state, candidate, policy_input)
+
+        report = run_exhaustive_branches(
+            spec=_spec(), checkpoint=adapter.checkpoint, candidates=candidates,
+            restore_checkpoint=adapter.restore, restored_state_hash=adapter.state_hash,
+            execute_candidate=check_types,
+        )
+        self.assertTrue(report["passed"])
+
     def test_private_candidate_fields_are_rejected_before_restore_or_execution(self):
         for extra in (
             {"hidden_witness": {"answer": "A"}},
