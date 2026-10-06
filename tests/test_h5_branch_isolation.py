@@ -7,6 +7,7 @@ from pathlib import Path
 from adapters.imageprogram_reference.h5_branch_isolation import (
     BranchIsolationError,
     audit_order_invariance,
+    candidate_manifest_hash,
     deterministic_audit_projection,
     run_exhaustive_branches,
     write_deterministic_audit,
@@ -157,6 +158,88 @@ class FakeAdapter:
 
 
 class H5BranchIsolationTests(unittest.TestCase):
+    def test_private_candidate_fields_are_rejected_before_restore_or_execution(self):
+        for extra in (
+            {"hidden_witness": {"answer": "A"}},
+            {"metadata": [{"oracle_outcome": "completed"}]},
+            {"metadata": {"path": "private/checkpoint.npz"}},
+        ):
+            with self.subTest(extra=extra):
+                candidates = _candidates()
+                candidates[-1].update(extra)
+                adapter = FakeAdapter()
+                with self.assertRaises(BranchIsolationError):
+                    run_exhaustive_branches(
+                        spec=_spec(), checkpoint=adapter.checkpoint,
+                        candidates=candidates, restore_checkpoint=adapter.restore,
+                        restored_state_hash=adapter.state_hash,
+                        execute_candidate=adapter.execute,
+                    )
+                self.assertEqual(adapter.restore_calls, 0)
+                self.assertEqual(adapter.execute_calls, 0)
+
+    def test_manifest_binds_payload_even_when_declared_hash_is_stale(self):
+        original = _candidates()
+        edited = copy.deepcopy(original)
+        edited[0]["public_payload"]["variant"] = "changed"
+        self.assertEqual(
+            original[0]["candidate_public_payload_hash"],
+            edited[0]["candidate_public_payload_hash"],
+        )
+        self.assertNotEqual(candidate_manifest_hash(original), candidate_manifest_hash(edited))
+
+    def test_manifest_binds_extra_callback_visible_fields(self):
+        original = _candidates()
+        edited = copy.deepcopy(original)
+        edited[0]["public_metadata"] = {"pressure": 0.5}
+        self.assertNotEqual(candidate_manifest_hash(original), candidate_manifest_hash(edited))
+
+    def test_manifest_is_canonical_across_candidate_and_mapping_order(self):
+        original = _candidates()
+        reordered = [dict(reversed(list(c.items()))) for c in reversed(original)]
+        for candidate in reordered:
+            candidate["public_payload"] = dict(reversed(list(candidate["public_payload"].items())))
+        self.assertEqual(candidate_manifest_hash(original), candidate_manifest_hash(reordered))
+
+    def test_audit_uses_frozen_candidates_when_callback_mutates_caller_input(self):
+        candidates = _candidates()
+        frozen = copy.deepcopy(candidates)
+        expected_manifest = candidate_manifest_hash(frozen)
+        adapter = FakeAdapter()
+
+        def mutate_caller(state, candidate, policy_input):
+            self.assertEqual(candidate, frozen[ord(candidate["candidate_id"]) - 65])
+            candidates[-1]["hidden_witness"] = "must not enter frozen candidates"
+            candidates[0]["public_payload"]["variant"] = "changed-by-callback"
+            return adapter.execute(state, candidate, policy_input)
+
+        audit = audit_order_invariance(
+            spec=_spec(), checkpoint=adapter.checkpoint, candidates=candidates,
+            restore_checkpoint=adapter.restore, restored_state_hash=adapter.state_hash,
+            execute_candidate=mutate_caller,
+        )
+        self.assertTrue(audit["passed"])
+        self.assertEqual(audit["forward"]["candidate_manifest_hash"], expected_manifest)
+        self.assertEqual(audit["reverse"]["candidate_manifest_hash"], expected_manifest)
+        self.assertEqual(adapter.execute_calls, 8)
+
+    def test_reports_bind_payload_edits_despite_unchanged_outcome_identifiers(self):
+        def run(candidates):
+            adapter = FakeAdapter()
+            return run_exhaustive_branches(
+                spec=_spec(), checkpoint=adapter.checkpoint, candidates=candidates,
+                restore_checkpoint=adapter.restore, restored_state_hash=adapter.state_hash,
+                execute_candidate=adapter.execute,
+            )
+
+        original = _candidates()
+        edited = copy.deepcopy(original)
+        edited[0]["public_payload"]["variant"] = "changed"
+        first, second = run(original), run(edited)
+        self.assertTrue(first["passed"] and second["passed"])
+        self.assertEqual(first["branches"], second["branches"])
+        self.assertNotEqual(first["candidate_manifest_hash"], second["candidate_manifest_hash"])
+
     def test_forward_reverse_audit_reverses_all_pairs_and_repeats_every_candidate(self):
         adapter = FakeAdapter()
         report = audit_order_invariance(
