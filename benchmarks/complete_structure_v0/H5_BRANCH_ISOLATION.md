@@ -50,7 +50,8 @@ valid implementation.
 
 ## Public/private boundary
 
-The policy input and candidate public payload are scanned before execution for
+The policy input and entire callback-visible candidate mapping (including extra
+metadata outside `public_payload`) are scanned before restore or execution for
 management/evaluator-only keys and paths such as:
 
 - hidden witness
@@ -62,6 +63,32 @@ management/evaluator-only keys and paths such as:
 
 The opaque management checkpoint is supplied separately to the restore callback.
 It is not placed inside the policy input.
+
+## Candidate provenance binding (report/audit format 2)
+
+`candidate_manifest_hash` hashes the complete candidate mappings, sorted by
+`candidate_id`, using Arena's canonical JSON encoding (sorted keys, compact
+separators, UTF-8, no NaN) and SHA-256. It therefore includes `public_payload`,
+the declared `candidate_public_payload_hash`, and any extra callback-visible
+metadata. Editing payload content while leaving the declared hash unchanged
+changes the Arena manifest digest. Candidate and mapping iteration order do
+not change it.
+
+Candidate mappings must be plain JSON-native dictionaries with string keys,
+lists, strings, booleans, integers, finite floats or null. Tuples, non-string
+keys, custom type subclasses and other Python-only values are rejected before
+callbacks. This prevents JSON hashing from collapsing callback-visible type
+differences (for example, tuples versus lists or integer versus string keys).
+
+Candidates are deep-copied at run/audit entry, and the manifest digest is
+computed before callbacks run. Execution and reporting use this frozen content.
+Each execute callback still receives its own deep copy.
+
+This is an Arena-local binding, not validation or replacement of ImageProgram's
+producer-defined `candidate_public_payload_hash` or `candidate_set_hash`.
+Canonical outcome records retain those producer identifiers unchanged. Reports
+and audits now use format 2 to distinguish the stronger manifest semantics;
+format 1 digests must not be compared as if they used the same content binding.
 
 ## Forward/reverse canary
 
@@ -135,6 +162,9 @@ The dedicated tests cover:
 - deliberately sticky restore is detected;
 - repeated candidate semantic determinism;
 - policy-private/oracle input rejected before execution;
+- private/oracle fields and paths anywhere in candidates rejected before restore;
+- payload and extra metadata edits change the manifest even with a stale declared hash;
+- manifest identity ignores candidate order and JSON mapping order;
 - H5 contract hash mismatch rejected;
 - research and policy cost channels remain separate;
 - deterministic audit projection preserves simulation semantics while excluding
