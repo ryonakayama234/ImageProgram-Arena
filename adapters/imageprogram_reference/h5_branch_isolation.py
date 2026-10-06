@@ -33,7 +33,7 @@ FORBIDDEN_POLICY_KEYS = frozenset(
         "checkpoint_path",
     }
 )
-FORBIDDEN_POLICY_TEXT = ("private/", "private\\\\", ".npz")
+FORBIDDEN_POLICY_TEXT = ("private/", "private\\", ".npz")
 REQUIRED_SPEC_FIELDS = (
     "task_lineage",
     "public_task_hash",
