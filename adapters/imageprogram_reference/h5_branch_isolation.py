@@ -12,6 +12,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -124,12 +125,33 @@ def _validate_spec(spec: Mapping[str, Any]) -> None:
     _walk_public(spec["policy_input"])
 
 
+def _require_json_native(value: Any, path: tuple[str, ...]) -> None:
+    """Reject Python types that JSON would collapse but callbacks could distinguish."""
+
+    location = ".".join(path)
+    if type(value) is dict:
+        for key, child in value.items():
+            if type(key) is not str:
+                raise BranchIsolationError(f"candidate JSON keys must be strings at {location}")
+            _require_json_native(child, (*path, key))
+    elif type(value) is list:
+        for index, child in enumerate(value):
+            _require_json_native(child, (*path, str(index)))
+    elif value is None or type(value) in (str, bool, int):
+        return
+    elif type(value) is float and math.isfinite(value):
+        return
+    else:
+        raise BranchIsolationError(f"candidate requires JSON-native values at {location}")
+
+
 def _validate_candidates(candidates: Sequence[Mapping[str, Any]]) -> dict[str, Mapping[str, Any]]:
     if not candidates:
         raise BranchIsolationError("candidate set must not be empty")
     by_id: dict[str, Mapping[str, Any]] = {}
     for index, candidate in enumerate(candidates):
         candidate = _require_mapping(candidate, name=f"candidate[{index}]")
+        _require_json_native(candidate, (f"candidate[{index}]",))
         _require_fields(candidate, REQUIRED_CANDIDATE_FIELDS, name=f"candidate[{index}]")
         candidate_id = candidate["candidate_id"]
         if not isinstance(candidate_id, str) or not candidate_id:
