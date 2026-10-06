@@ -145,12 +145,13 @@ class FakeAdapter:
         state["ink"] += amount
         status = "failed" if self.fail_a and candidate["candidate_id"] == "A" else "completed"
         wall = self.execute_calls / 1000 if self.varying_wall_time else 0.01
+        record = _outcome_record(_spec(), candidate, status=status, wall_time=wall)
+        if self.varying_wall_time:
+            record["record_id"] = f"record-{candidate['candidate_id']}-{self.execute_calls}"
         return {
             "initial_state_hash": initial,
             "final_state_hash": self.state_hash(state),
-            "outcome_record": _outcome_record(
-                _spec(), candidate, status=status, wall_time=wall
-            ),
+            "outcome_record": record,
             "policy_execution_cost": _cost(wall + 1.0),
         }
 
@@ -272,6 +273,7 @@ class H5BranchIsolationTests(unittest.TestCase):
         projected = deterministic_audit_projection(audit)
         serialized = json.dumps(projected, sort_keys=True)
         self.assertNotIn("wall_time_s", serialized)
+        self.assertNotIn("record_id", serialized)
         self.assertIn("sim_time_s", serialized)
 
         with tempfile.TemporaryDirectory() as temp:
@@ -279,7 +281,9 @@ class H5BranchIsolationTests(unittest.TestCase):
             write_deterministic_audit(audit, first)
             parsed = json.loads(first.read_text(encoding="utf-8"))
             self.assertTrue(parsed["passed"])
-            self.assertNotIn("wall_time_s", first.read_text(encoding="utf-8"))
+            written = first.read_text(encoding="utf-8")
+            self.assertNotIn("wall_time_s", written)
+            self.assertNotIn("record_id", written)
 
 
 if __name__ == "__main__":
