@@ -85,7 +85,7 @@ infrastructure gate.
 
 ## Semantic determinism and wall time
 
-ImageProgram's cost record includes measured wall time. Wall time is real
+ImageProgram's cost record includes run-local record identity and measured wall time. Wall time is real
 research cost and must not be fabricated or discarded from the raw canonical
 record, but it is not a deterministic state transition quantity.
 
@@ -95,7 +95,7 @@ Therefore:
 - policy execution cost remains structurally separate from
   `branch_research_cost`;
 - branch semantic digests exclude only `record_id` and `wall_time_s`;
-- deterministic audit JSON excludes only `wall_time_s`.
+- deterministic audit JSON excludes run-local `record_id` and measured `wall_time_s`.
 
 Simulation time, motor commands, strokes, tip distance, observed Outcome,
 initial/final state hashes, replay status, contract hashes, and provenance remain
