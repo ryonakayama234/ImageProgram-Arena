@@ -260,7 +260,7 @@ class H5BranchIsolationTests(unittest.TestCase):
         )
         self.assertEqual(forward_a["semantic_digest"], reverse_a["semantic_digest"])
 
-    def test_deterministic_audit_writer_removes_only_wall_time(self):
+    def test_deterministic_audit_writer_removes_run_local_fields(self):
         adapter = FakeAdapter(varying_wall_time=True)
         audit = audit_order_invariance(
             spec=_spec(),
