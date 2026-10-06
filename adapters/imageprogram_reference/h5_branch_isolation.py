@@ -15,8 +15,8 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
-REPORT_FORMAT = "imageprogram-arena-h5-branch-isolation-1"
-AUDIT_FORMAT = "imageprogram-arena-h5-branch-isolation-audit-1"
+REPORT_FORMAT = "imageprogram-arena-h5-branch-isolation-2"
+AUDIT_FORMAT = "imageprogram-arena-h5-branch-isolation-audit-2"
 
 FORBIDDEN_POLICY_KEYS = frozenset(
     {
@@ -136,24 +136,17 @@ def _validate_candidates(candidates: Sequence[Mapping[str, Any]]) -> dict[str, M
             raise BranchIsolationError("candidate_id must be a non-empty string")
         if candidate_id in by_id:
             raise BranchIsolationError(f"duplicate candidate_id: {candidate_id}")
-        _walk_public(candidate["public_payload"], (f"candidate[{candidate_id}]", "public_payload"))
+        # The execute callback sees the whole mapping, including extra metadata.
+        _walk_public(candidate, (f"candidate[{candidate_id}]",))
         by_id[candidate_id] = candidate
     return by_id
 
 
 def candidate_manifest_hash(candidates: Sequence[Mapping[str, Any]]) -> str:
-    """Arena-local identity for the declared candidate list, not the canonical set hash."""
+    """Bind all callback-visible candidate content; not the canonical producer set hash."""
 
     by_id = _validate_candidates(candidates)
-    descriptor = [
-        {
-            "candidate_id": candidate_id,
-            "candidate_public_payload_hash": by_id[candidate_id][
-                "candidate_public_payload_hash"
-            ],
-        }
-        for candidate_id in sorted(by_id)
-    ]
+    descriptor = [dict(by_id[candidate_id]) for candidate_id in sorted(by_id)]
     return _sha256_json(descriptor)
 
 
@@ -293,7 +286,10 @@ def run_exhaustive_branches(
 
     spec = _require_mapping(spec, name="branch spec")
     _validate_spec(spec)
+    # Freeze the same candidate content used for validation, execution and reporting.
+    candidates = copy.deepcopy(candidates)
     by_id = _validate_candidates(candidates)
+    manifest_hash = candidate_manifest_hash(candidates)
     candidate_ids = list(by_id)
     execution_order = list(order) if order is not None else list(candidate_ids)
     if len(execution_order) != len(candidate_ids) or set(execution_order) != set(candidate_ids):
@@ -369,7 +365,7 @@ def run_exhaustive_branches(
         "task_lineage": spec["task_lineage"],
         "contract_ref": copy.deepcopy(spec["contract_ref"]),
         "candidate_set_hash": spec["candidate_set_hash"],
-        "candidate_manifest_hash": candidate_manifest_hash(candidates),
+        "candidate_manifest_hash": manifest_hash,
         "management_initial_state_hash": spec["management_initial_state_hash"],
         "execution_order": execution_order,
         "branches": [by_candidate[candidate_id] for candidate_id in sorted(by_candidate)],
@@ -404,6 +400,7 @@ def audit_order_invariance(
 ) -> dict[str, Any]:
     """Run forward and reverse orders and require per-candidate semantic identity."""
 
+    candidates = copy.deepcopy(candidates)
     by_id = _validate_candidates(candidates)
     forward_order = list(by_id)
     reverse_order = list(reversed(forward_order))
