@@ -74,6 +74,12 @@ metadata. Editing payload content while leaving the declared hash unchanged
 changes the Arena manifest digest. Candidate and mapping iteration order do
 not change it.
 
+Candidate mappings must be plain JSON-native dictionaries with string keys,
+lists, strings, booleans, integers, finite floats or null. Tuples, non-string
+keys, custom type subclasses and other Python-only values are rejected before
+callbacks. This prevents JSON hashing from collapsing callback-visible type
+differences (for example, tuples versus lists or integer versus string keys).
+
 Candidates are deep-copied at run/audit entry, and the manifest digest is
 computed before callbacks run. Execution and reporting use this frozen content.
 Each execute callback still receives its own deep copy.
