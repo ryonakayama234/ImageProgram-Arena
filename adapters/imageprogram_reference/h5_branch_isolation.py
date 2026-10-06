@@ -243,32 +243,28 @@ def _validate_outcome_record(
         raise BranchIsolationError("branch_research_cost must be preserved separately")
 
 
-def _without_wall_time(value: Any) -> Any:
+def _semantic_projection(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {
-            key: _without_wall_time(child)
+            key: _semantic_projection(child)
             for key, child in value.items()
-            if key != "wall_time_s"
+            if key not in {"record_id", "wall_time_s"}
         }
     if isinstance(value, list):
-        return [_without_wall_time(child) for child in value]
+        return [_semantic_projection(child) for child in value]
     if isinstance(value, tuple):
-        return tuple(_without_wall_time(child) for child in value)
+        return tuple(_semantic_projection(child) for child in value)
     return value
 
 
 def _semantic_digest(branch: Mapping[str, Any]) -> str:
     return _sha256_json(
-        _without_wall_time(
+        _semantic_projection(
             {
                 "candidate_id": branch["candidate_id"],
                 "initial_state_hash": branch["initial_state_hash"],
                 "final_state_hash": branch["final_state_hash"],
-                "outcome_record": {
-                    key: value
-                    for key, value in branch["outcome_record"].items()
-                    if key != "record_id"
-                },
+                "outcome_record": branch["outcome_record"],
                 "policy_execution_cost": branch["policy_execution_cost"],
             }
         )
@@ -361,7 +357,7 @@ def run_exhaustive_branches(
             for branch in branches
         ),
         "contract_version_hash_pinned": True,
-        "policy_private_data_access_prevented": True,
+        "policy_input_public_boundary_passed": True,
         "research_and_policy_cost_channels_separate": all(
             isinstance(branch["policy_execution_cost"], Mapping)
             and isinstance(branch["outcome_record"]["branch_research_cost"], Mapping)
@@ -461,9 +457,9 @@ def audit_order_invariance(
 
 
 def deterministic_audit_projection(audit: Mapping[str, Any]) -> dict[str, Any]:
-    """Drop measured wall-time fields while retaining every semantic isolation result."""
+    """Drop run-local identity/timing fields while retaining semantic isolation results."""
 
-    return _without_wall_time(copy.deepcopy(dict(audit)))
+    return _semantic_projection(copy.deepcopy(dict(audit)))
 
 
 def write_deterministic_audit(audit: Mapping[str, Any], output: Path) -> Path:
