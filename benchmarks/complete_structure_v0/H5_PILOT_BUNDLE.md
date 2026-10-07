@@ -109,3 +109,36 @@ After ImageProgram #46 is available, the next step is a concrete reference adapt
 that loads that artifact, restores each management checkpoint, executes all 48
 branches, writes the raw evaluator-private bundle, and runs the independent
 consumer over the written file.
+
+
+## Concrete cross-repo run
+
+After ImageProgram #47 / #46 / #50 are merged and validated, generate #47 and #46
+artifacts from the **same exact ImageProgram commit**, then invoke Arena:
+
+```bash
+python adapters/imageprogram_reference/run_h5_pilot.py \
+  --imageprogram-root ../ImageProgram \
+  --lineage-root ../ImageProgram/runs/h5a-pilot-lineages \
+  --candidate-corpus ../ImageProgram/runs/h5a-pilot/fixed_candidate_corpus.json \
+  --source-commit <exact-40-hex-ImageProgram-commit> \
+  --out runs/h5a-pilot-12x4
+```
+
+The concrete adapter verifies before any branch execution:
+
+- #47 private summary benchmark/source commit;
+- #46 candidate-corpus version/source commit;
+- exact candidate-corpus hash provenance;
+- #47 public-input hash == #46 lineage public input;
+- checkpoint SHA-256;
+- frozen management state hash;
+- 12 unique task lineages and 12 unique source lineages;
+- #50 contract/runtime descriptor bound to the same ImageProgram commit.
+
+Each candidate is then executed by the ImageProgram #50 CLI in a fresh process from the
+same immutable checkpoint file. Arena does not implement Skill lowering, World execution,
+or Outcome measurement.
+
+Generated branch directories and the raw pilot bundle are evaluator/management artifacts
+and stay out of Git.
