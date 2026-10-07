@@ -36,7 +36,8 @@ def _source() -> dict:
     return {
         "repository": "ryonakayama234/ImageProgram",
         "commit": "134d7cb8486373f3a70a1c506e3def0cb40d25c9",
-        "candidate_corpus_issue": 46,
+        "candidate_corpus_version": "h5-fixed-candidate-corpus-v0",
+        "candidate_corpus_hash": _digest("fixed-candidate-corpus"),
     }
 
 
@@ -210,6 +211,24 @@ class H5PilotBundleTests(unittest.TestCase):
         _, second = _run(reordered)
         self.assertEqual(first["lineage_manifest_hash"], second["lineage_manifest_hash"])
         self.assertEqual(first["semantic_bundle_hash"], second["semantic_bundle_hash"])
+
+    def test_candidate_corpus_provenance_is_required(self):
+        lineages = [_lineage(index) for index in range(EXPECTED_LINEAGES)]
+        source = _source()
+        del source["candidate_corpus_hash"]
+        adapter = FakePilotAdapter()
+        with self.assertRaisesRegex(
+            PilotBundleError,
+            "source.candidate_corpus_hash",
+        ):
+            run_pilot_bundle(
+                source=source,
+                lineages=lineages,
+                restore_checkpoint=adapter.restore,
+                restored_state_hash=adapter.state_hash,
+                execute_candidate=adapter.execute,
+            )
+        self.assertEqual(adapter.execute_calls, 0)
 
     def test_duplicate_lineage_is_rejected_before_execution(self):
         lineages = [_lineage(index) for index in range(EXPECTED_LINEAGES)]
