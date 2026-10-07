@@ -216,6 +216,7 @@ def run_pilot_bundle(
             {
                 **descriptor,
                 "execution_order_policy": "canonical_candidate_id",
+                "candidates": copy.deepcopy(list(candidates)),
                 "report": report,
             }
         )
@@ -280,6 +281,34 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         duplicate = task_lineage in unique_lineages
         unique_lineages.add(task_lineage)
 
+        candidate_snapshots = item.get("candidates")
+        if not isinstance(candidate_snapshots, list):
+            raise PilotBundleError(f"{task_lineage}.candidates must be a list")
+        if len(candidate_snapshots) != EXPECTED_CANDIDATES_PER_LINEAGE:
+            raise PilotBundleError(
+                f"{task_lineage} requires {EXPECTED_CANDIDATES_PER_LINEAGE} candidate snapshots"
+            )
+        try:
+            recomputed_candidate_manifest_hash = candidate_manifest_hash(candidate_snapshots)
+        except BranchIsolationError as exc:
+            raise PilotBundleError(
+                f"{task_lineage} candidate snapshot boundary failure: {exc}"
+            ) from exc
+        snapshot_by_id: dict[str, Mapping[str, Any]] = {}
+        for candidate_index, raw_candidate in enumerate(candidate_snapshots):
+            candidate = _require_mapping(
+                raw_candidate, name=f"{task_lineage}.candidates[{candidate_index}]"
+            )
+            candidate_id = _require_string(
+                candidate.get("candidate_id"),
+                name=f"{task_lineage}.candidates[{candidate_index}].candidate_id",
+            )
+            if candidate_id in snapshot_by_id:
+                raise PilotBundleError(
+                    f"{task_lineage} duplicate candidate snapshot: {candidate_id}"
+                )
+            snapshot_by_id[candidate_id] = candidate
+
         report = _require_mapping(item.get("report"), name=f"{task_lineage}.report")
         if report.get("format") != REPORT_FORMAT:
             raise PilotBundleError(f"{task_lineage} uses unexpected branch report format")
@@ -291,6 +320,8 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         candidate_ids: set[str] = set()
         initial_hashes: set[str] = set()
         replay_ok = True
+        candidate_payload_links_valid = True
+        branch_semantic_digests_valid = True
         for branch_index, raw_branch in enumerate(branches):
             branch = _require_mapping(
                 raw_branch, name=f"{task_lineage}.branches[{branch_index}]"
@@ -308,6 +339,29 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             record = _require_mapping(
                 branch.get("outcome_record"),
                 name=f"{task_lineage}.{candidate_id}.outcome_record",
+            )
+            snapshot = snapshot_by_id.get(candidate_id)
+            if snapshot is None:
+                candidate_payload_links_valid = False
+            else:
+                candidate_payload_links_valid = candidate_payload_links_valid and (
+                    record.get("candidate_id") == candidate_id
+                    and record.get("candidate_public_payload_hash")
+                    == snapshot.get("candidate_public_payload_hash")
+                )
+            expected_branch_digest = _sha256_json(
+                _semantic_projection(
+                    {
+                        "candidate_id": candidate_id,
+                        "initial_state_hash": branch.get("initial_state_hash"),
+                        "final_state_hash": branch.get("final_state_hash"),
+                        "outcome_record": record,
+                        "policy_execution_cost": branch.get("policy_execution_cost"),
+                    }
+                )
+            )
+            branch_semantic_digests_valid = branch_semantic_digests_valid and (
+                branch.get("semantic_digest") == expected_branch_digest
             )
             status = record.get("record_status")
             branch_replay_ok = True
@@ -349,15 +403,21 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             "not_duplicate_lineage": not duplicate,
             "report_passed": report.get("passed") is True,
             "exact_candidate_count": len(branches) == EXPECTED_CANDIDATES_PER_LINEAGE,
-            "unique_candidate_ids": len(candidate_ids) == EXPECTED_CANDIDATES_PER_LINEAGE,
+            "unique_candidate_ids": (
+                len(candidate_ids) == EXPECTED_CANDIDATES_PER_LINEAGE
+                and candidate_ids == set(snapshot_by_id)
+            ),
             "same_management_initial_state": same_initial,
             "candidate_set_hash_bound": (
                 report.get("candidate_set_hash") == item.get("candidate_set_hash")
             ),
-            "candidate_manifest_hash_bound": (
-                report.get("candidate_manifest_hash")
+            "candidate_manifest_hash_recomputed": (
+                recomputed_candidate_manifest_hash
                 == item.get("candidate_manifest_hash")
+                == report.get("candidate_manifest_hash")
             ),
+            "candidate_payload_links_valid": candidate_payload_links_valid,
+            "branch_semantic_digests_valid": branch_semantic_digests_valid,
             "replay_semantics_valid": replay_ok,
         }
         lineage_checks[task_lineage] = checks
