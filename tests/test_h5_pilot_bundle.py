@@ -247,6 +247,10 @@ class H5PilotBundleTests(unittest.TestCase):
         ] += 100
 
         audit = verify_pilot_bundle(edited)
+        first_lineage = edited["lineages"][0]["task_lineage"]
+        self.assertFalse(
+            audit["lineage_checks"][first_lineage]["branch_semantic_digests_valid"]
+        )
         self.assertFalse(audit["checks"]["semantic_bundle_hash_matches"])
         self.assertFalse(audit["passed"])
 
@@ -259,6 +263,10 @@ class H5PilotBundleTests(unittest.TestCase):
         ]["wall_time_s"] += 10.0
 
         audit = verify_pilot_bundle(edited)
+        first_lineage = edited["lineages"][0]["task_lineage"]
+        self.assertTrue(
+            audit["lineage_checks"][first_lineage]["branch_semantic_digests_valid"]
+        )
         self.assertTrue(audit["checks"]["semantic_bundle_hash_matches"])
         self.assertTrue(audit["passed"])
         self.assertGreater(
@@ -266,11 +274,25 @@ class H5PilotBundleTests(unittest.TestCase):
             verify_pilot_bundle(bundle)["total_branch_research_cost"]["wall_time_s"],
         )
 
+    def test_consumer_recomputes_candidate_manifest_from_snapshots(self):
+        lineages = [_lineage(index) for index in range(EXPECTED_LINEAGES)]
+        _, bundle = _run(lineages)
+        edited = copy.deepcopy(bundle)
+        edited["lineages"][0]["candidates"][0]["public_payload"]["variant"] = "tampered"
+
+        audit = verify_pilot_bundle(edited)
+        first_lineage = edited["lineages"][0]["task_lineage"]
+        self.assertFalse(
+            audit["lineage_checks"][first_lineage]["candidate_manifest_hash_recomputed"]
+        )
+        self.assertFalse(audit["passed"])
+
     def test_bundle_is_json_serializable_and_contains_no_checkpoint(self):
         lineages = [_lineage(index) for index in range(EXPECTED_LINEAGES)]
         _, bundle = _run(lineages)
         payload = json.dumps(bundle, sort_keys=True)
         self.assertNotIn('"checkpoint"', payload)
+        self.assertIn('"candidates"', payload)
         self.assertIn('"semantic_bundle_hash"', payload)
 
 
