@@ -104,6 +104,12 @@ def _lineage_descriptor(lineage: Mapping[str, Any]) -> dict[str, Any]:
         "initial_public_state_hash",
         "management_initial_state_hash",
         "candidate_set_hash",
+        "body_spec_hash",
+        "motor_profile_hash",
+        "adapter_version",
+        "runtime_version",
+        "evaluator_version",
+        "contract_ref",
     )
     missing = [field for field in required_spec if field not in spec]
     if missing:
@@ -126,6 +132,11 @@ def _lineage_descriptor(lineage: Mapping[str, Any]) -> dict[str, Any]:
         "management_initial_state_hash": spec["management_initial_state_hash"],
         "candidate_set_hash": spec["candidate_set_hash"],
         "candidate_manifest_hash": candidate_manifest_hash(candidates),
+        "body_spec_hash": spec["body_spec_hash"],
+        "motor_profile_hash": spec["motor_profile_hash"],
+        "adapter_version": spec["adapter_version"],
+        "runtime_version": spec["runtime_version"],
+        "evaluator_version": spec["evaluator_version"],
     }
 
 
@@ -216,7 +227,12 @@ def run_pilot_bundle(
             {
                 **descriptor,
                 "execution_order_policy": "canonical_candidate_id",
-                "candidates": copy.deepcopy(list(candidates)),
+                "candidates": [
+                    copy.deepcopy(candidate)
+                    for candidate in sorted(
+                        candidates, key=lambda candidate: candidate["candidate_id"]
+                    )
+                ],
                 "report": report,
             }
         )
@@ -317,11 +333,20 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             raise PilotBundleError(f"{task_lineage}.report.branches must be a list")
         total_branches += len(branches)
 
+        report_contract_ref = _require_mapping(
+            report.get("contract_ref"), name=f"{task_lineage}.report.contract_ref"
+        )
+        source_contract_pinned = (
+            report_contract_ref.get("repository") == source.get("repository")
+            and report_contract_ref.get("commit") == source.get("commit")
+        )
         candidate_ids: set[str] = set()
         initial_hashes: set[str] = set()
         replay_ok = True
         candidate_payload_links_valid = True
         branch_semantic_digests_valid = True
+        record_provenance_valid = True
+        prediction_inputs_public_only = True
         for branch_index, raw_branch in enumerate(branches):
             branch = _require_mapping(
                 raw_branch, name=f"{task_lineage}.branches[{branch_index}]"
@@ -362,6 +387,28 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             )
             branch_semantic_digests_valid = branch_semantic_digests_valid and (
                 branch.get("semantic_digest") == expected_branch_digest
+            )
+            record_provenance_valid = record_provenance_valid and all(
+                record.get(field) == item.get(field)
+                for field in (
+                    "task_lineage",
+                    "public_task_hash",
+                    "initial_public_state_hash",
+                    "candidate_set_hash",
+                    "body_spec_hash",
+                    "motor_profile_hash",
+                    "adapter_version",
+                    "runtime_version",
+                    "evaluator_version",
+                )
+            )
+            prediction_input = _require_mapping(
+                record.get("prediction_input"),
+                name=f"{task_lineage}.{candidate_id}.prediction_input",
+            )
+            prediction_inputs_public_only = prediction_inputs_public_only and (
+                prediction_input.get("public_only") is True
+                and prediction_input.get("sha256") == item.get("initial_public_state_hash")
             )
             status = record.get("record_status")
             branch_replay_ok = True
@@ -416,8 +463,14 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
                 == item.get("candidate_manifest_hash")
                 == report.get("candidate_manifest_hash")
             ),
+            "source_contract_pinned": source_contract_pinned,
+            "execution_order_canonical": (
+                report.get("execution_order") == sorted(snapshot_by_id)
+            ),
             "candidate_payload_links_valid": candidate_payload_links_valid,
             "branch_semantic_digests_valid": branch_semantic_digests_valid,
+            "record_provenance_valid": record_provenance_valid,
+            "prediction_inputs_public_only": prediction_inputs_public_only,
             "replay_semantics_valid": replay_ok,
         }
         lineage_checks[task_lineage] = checks
@@ -433,6 +486,11 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
                     "management_initial_state_hash",
                     "candidate_set_hash",
                     "candidate_manifest_hash",
+                    "body_spec_hash",
+                    "motor_profile_hash",
+                    "adapter_version",
+                    "runtime_version",
+                    "evaluator_version",
                 )
             }
         )
