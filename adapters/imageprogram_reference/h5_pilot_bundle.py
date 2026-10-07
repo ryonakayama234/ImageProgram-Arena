@@ -195,6 +195,14 @@ def run_pilot_bundle(
     source = dict(_require_mapping(source, name="source"))
     _require_string(source.get("repository"), name="source.repository")
     _require_string(source.get("commit"), name="source.commit")
+    _require_string(
+        source.get("candidate_corpus_version"),
+        name="source.candidate_corpus_version",
+    )
+    _require_string(
+        source.get("candidate_corpus_hash"),
+        name="source.candidate_corpus_hash",
+    )
     prepared = _validate_lineage_inputs(lineages)
     descriptors = [descriptor for _, descriptor in prepared]
     manifest_hash = _lineage_manifest_hash(descriptors)
@@ -283,6 +291,14 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
     source = _require_mapping(bundle.get("source"), name="bundle.source")
     _require_string(source.get("repository"), name="source.repository")
     _require_string(source.get("commit"), name="source.commit")
+    _require_string(
+        source.get("candidate_corpus_version"),
+        name="source.candidate_corpus_version",
+    )
+    _require_string(
+        source.get("candidate_corpus_hash"),
+        name="source.candidate_corpus_hash",
+    )
     lineages = bundle.get("lineages")
     if not isinstance(lineages, list):
         raise PilotBundleError("bundle.lineages must be a list")
