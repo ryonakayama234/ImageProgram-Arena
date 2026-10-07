@@ -190,6 +190,7 @@ class H5PilotBundleTests(unittest.TestCase):
         self.assertEqual(adapter.restore_calls, 48)
         self.assertEqual(adapter.execute_calls, 48)
         self.assertEqual(audit["independent_lineages"], 12)
+        self.assertEqual(audit["independent_source_lineages"], 12)
         self.assertEqual(audit["candidate_executions"], 48)
         self.assertEqual(audit["missing_branches"], 0)
         self.assertEqual(audit["replay_failures"], 0)
@@ -215,6 +216,20 @@ class H5PilotBundleTests(unittest.TestCase):
         lineages[-1]["spec"]["task_lineage"] = lineages[0]["spec"]["task_lineage"]
         adapter = FakePilotAdapter()
         with self.assertRaisesRegex(PilotBundleError, "duplicate task_lineage"):
+            run_pilot_bundle(
+                source=_source(),
+                lineages=lineages,
+                restore_checkpoint=adapter.restore,
+                restored_state_hash=adapter.state_hash,
+                execute_candidate=adapter.execute,
+            )
+        self.assertEqual(adapter.execute_calls, 0)
+
+    def test_duplicate_source_lineage_is_rejected_before_execution(self):
+        lineages = [_lineage(index) for index in range(EXPECTED_LINEAGES)]
+        lineages[-1]["source_lineage"] = lineages[0]["source_lineage"]
+        adapter = FakePilotAdapter()
+        with self.assertRaisesRegex(PilotBundleError, "duplicate source_lineage"):
             run_pilot_bundle(
                 source=_source(),
                 lineages=lineages,
@@ -285,6 +300,15 @@ class H5PilotBundleTests(unittest.TestCase):
         self.assertFalse(
             audit["lineage_checks"][first_lineage]["candidate_manifest_hash_recomputed"]
         )
+        self.assertFalse(audit["passed"])
+
+    def test_consumer_rejects_wrong_benchmark_identity(self):
+        lineages = [_lineage(index) for index in range(EXPECTED_LINEAGES)]
+        _, bundle = _run(lineages)
+        edited = copy.deepcopy(bundle)
+        edited["benchmark"] = "complete_structure_v0"
+        audit = verify_pilot_bundle(edited)
+        self.assertFalse(audit["checks"]["benchmark_pinned"])
         self.assertFalse(audit["passed"])
 
     def test_bundle_is_json_serializable_and_contains_no_checkpoint(self):
