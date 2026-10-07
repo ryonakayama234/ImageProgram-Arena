@@ -28,6 +28,7 @@ from adapters.imageprogram_reference.h5_branch_isolation import (
 
 PILOT_FORMAT = "imageprogram-arena-h5-pilot-bundle-1"
 PILOT_AUDIT_FORMAT = "imageprogram-arena-h5-pilot-audit-1"
+PILOT_BENCHMARK = "complete_structure_pilot_v0"
 EXPECTED_LINEAGES = 12
 EXPECTED_CANDIDATES_PER_LINEAGE = 4
 
@@ -148,16 +149,21 @@ def _validate_lineage_inputs(
             f"H5 pilot requires exactly {EXPECTED_LINEAGES} task lineages"
         )
     prepared: list[tuple[Mapping[str, Any], dict[str, Any]]] = []
-    seen: set[str] = set()
+    seen_tasks: set[str] = set()
+    seen_sources: set[str] = set()
     for index, raw in enumerate(lineages):
         lineage = _require_mapping(raw, name=f"lineage[{index}]")
         if "checkpoint" not in lineage:
             raise PilotBundleError(f"lineage[{index}] missing checkpoint")
         descriptor = _lineage_descriptor(lineage)
         task_lineage = descriptor["task_lineage"]
-        if task_lineage in seen:
+        source_lineage = descriptor["source_lineage"]
+        if task_lineage in seen_tasks:
             raise PilotBundleError(f"duplicate task_lineage: {task_lineage}")
-        seen.add(task_lineage)
+        if source_lineage in seen_sources:
+            raise PilotBundleError(f"duplicate source_lineage: {source_lineage}")
+        seen_tasks.add(task_lineage)
+        seen_sources.add(source_lineage)
         prepared.append((lineage, descriptor))
     return sorted(prepared, key=lambda item: item[1]["task_lineage"])
 
@@ -239,7 +245,7 @@ def run_pilot_bundle(
 
     bundle: dict[str, Any] = {
         "format": PILOT_FORMAT,
-        "benchmark": "complete_structure_v0",
+        "benchmark": PILOT_BENCHMARK,
         "source": copy.deepcopy(source),
         "expected_lineages": EXPECTED_LINEAGES,
         "expected_candidates_per_lineage": EXPECTED_CANDIDATES_PER_LINEAGE,
@@ -282,6 +288,7 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         raise PilotBundleError("bundle.lineages must be a list")
 
     unique_lineages: set[str] = set()
+    unique_source_lineages: set[str] = set()
     descriptors: list[dict[str, Any]] = []
     total_branches = 0
     missing_branches = 0
@@ -296,6 +303,11 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         )
         duplicate = task_lineage in unique_lineages
         unique_lineages.add(task_lineage)
+        source_lineage = _require_string(
+            item.get("source_lineage"), name=f"lineage[{index}].source_lineage"
+        )
+        duplicate_source = source_lineage in unique_source_lineages
+        unique_source_lineages.add(source_lineage)
 
         candidate_snapshots = item.get("candidates")
         if not isinstance(candidate_snapshots, list):
@@ -448,6 +460,7 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         )
         checks = {
             "not_duplicate_lineage": not duplicate,
+            "not_duplicate_source_lineage": not duplicate_source,
             "report_passed": report.get("passed") is True,
             "exact_candidate_count": len(branches) == EXPECTED_CANDIDATES_PER_LINEAGE,
             "unique_candidate_ids": (
@@ -506,8 +519,12 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
     )
     recomputed_manifest_hash = _lineage_manifest_hash(descriptors)
     global_checks = {
+        "benchmark_pinned": bundle.get("benchmark") == PILOT_BENCHMARK,
         "exact_lineage_count": len(lineages) == EXPECTED_LINEAGES,
         "unique_lineage_count": len(unique_lineages) == EXPECTED_LINEAGES,
+        "unique_source_lineage_count": (
+            len(unique_source_lineages) == EXPECTED_LINEAGES
+        ),
         "exact_branch_count": total_branches
         == EXPECTED_LINEAGES * EXPECTED_CANDIDATES_PER_LINEAGE,
         "lineage_manifest_hash_matches": (
@@ -525,6 +542,7 @@ def verify_pilot_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "benchmark": bundle.get("benchmark"),
         "source": copy.deepcopy(dict(source)),
         "independent_lineages": len(unique_lineages),
+        "independent_source_lineages": len(unique_source_lineages),
         "candidate_executions": total_branches,
         "missing_branches": missing_branches,
         "replay_failures": replay_failures,
