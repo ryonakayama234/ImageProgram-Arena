@@ -249,6 +249,45 @@ def prepare_h5_pilot_inputs(
     return source, sorted(lineages, key=lambda item: item["spec"]["task_lineage"])
 
 
+def _validate_imageprogram_checkout(
+    imageprogram_root: Path,
+    source_commit: str,
+) -> None:
+    imageprogram_root = Path(imageprogram_root)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=imageprogram_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if head.returncode != 0:
+        raise PilotBundleError(
+            "cannot resolve ImageProgram Git HEAD: " + head.stderr.strip()
+        )
+    if head.stdout.strip() != source_commit:
+        raise PilotBundleError(
+            "ImageProgram checkout HEAD does not match --source-commit"
+        )
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=imageprogram_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if status.returncode != 0:
+        raise PilotBundleError(
+            "cannot inspect ImageProgram working tree: " + status.stderr.strip()
+        )
+    if status.stdout.strip():
+        raise PilotBundleError(
+            "ImageProgram working tree must be clean for the frozen H5 pilot"
+        )
+
+
 def _run_imageprogram_json(
     *,
     imageprogram_root: Path,
@@ -286,6 +325,8 @@ def run_cross_repo_h5_pilot(
     output: Path,
 ) -> dict[str, Any]:
     """Run the concrete #47 -> #46 -> #50 -> Arena #9 pilot stack."""
+
+    _validate_imageprogram_checkout(imageprogram_root, source_commit)
 
     output = Path(output)
     if output.exists():
