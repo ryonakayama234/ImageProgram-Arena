@@ -114,6 +114,31 @@ class DrawingReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(DrawingReviewError, 'public/private'):
                 create_review_pack([('first', episode, replay)], root / 'pack')
 
+    def test_final_must_match_terminal_frame(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            write(episode, 'final.png', b'stale-final-image')
+            manifest = json.loads((episode / 'manifest.json').read_text())
+            manifest['files']['final.png'] = digest((episode / 'final.png').read_bytes())
+            write(episode, 'manifest.json', jsonb(manifest))
+            with self.assertRaisesRegex(DrawingReviewError, 'terminal numbered frame'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+
+    def test_status_must_be_explicit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            result = json.loads((episode / 'result.json').read_text())
+            result.pop('status')
+            write(episode, 'result.json', jsonb(result))
+            manifest = json.loads((episode / 'manifest.json').read_text())
+            manifest['files']['result.json'] = digest((episode / 'result.json').read_bytes())
+            manifest['result_sha256'] = manifest['files']['result.json']
+            write(episode, 'manifest.json', jsonb(manifest))
+            with self.assertRaisesRegex(DrawingReviewError, 'terminal execution status'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+
     def test_hard_link_to_private_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
