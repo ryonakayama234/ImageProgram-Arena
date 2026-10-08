@@ -10,11 +10,13 @@ import argparse
 import hashlib
 import html
 import json
+import os
 import re
-import shutil
+import stat
 from pathlib import Path
 
 FORMAT = 'arena-drawing-review-v0'
+MAX_PUBLIC_FRAME_BYTES = 64 * 1024 * 1024
 LABEL = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,47}$')
 PUBLIC_TOP = {'request.json', 'program.json', 'initial_observation.json',
               'transitions.jsonl', 'result.json', 'final.png', 'rejected_action.json'}
@@ -65,6 +67,56 @@ def safe_public_path(root: Path, name: str) -> Path:
     if path.stat().st_nlink != 1:
         raise DrawingReviewError(f'hard-linked public artifact: {name}')
     return path
+
+
+
+def verified_frame_snapshot(root: Path, name: str, expected_sha256: str) -> bytes:
+    """Snapshot *verified* public frame bytes before exposing them in the Review Pack.
+
+    The prior episode check and replay may take a long time. Never copy a
+    pathname re-opened after replay: another process could substitute a
+    symlink to a private artifact, including on the parent frames directory.
+    Open every component relative to an already opened directory fd using
+    O_NOFOLLOW. Verify inode type and hard-link count, then the actual bytes
+    read from that stable fd *before* writing public output.
+    """
+    # Enforce the same public-only filename allowlist as the manifest validator.
+    # This check alone is NOT relied on for race safety.
+    safe_public_path(root, name)
+    relative = Path(name)
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    directory_fd = None
+    source_fd = None
+    try:
+        directory_fd = os.open(root, directory_flags)
+        for component in relative.parts[:-1]:
+            child_fd = os.open(component, directory_flags, dir_fd=directory_fd)
+            os.close(directory_fd)
+            directory_fd = child_fd
+        source_fd = os.open(relative.name, file_flags, dir_fd=directory_fd)
+        info = os.fstat(source_fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise DrawingReviewError(f'unsafe public frame inode: {name}')
+        if info.st_size > MAX_PUBLIC_FRAME_BYTES:
+            raise DrawingReviewError(f'public frame too large: {name}')
+        with os.fdopen(source_fd, 'rb') as source:
+            source_fd = None  # fd is now owned by the file object
+            data = source.read(MAX_PUBLIC_FRAME_BYTES + 1)
+    except OSError as exc:
+        raise DrawingReviewError(f'cannot safely open public frame: {name}') from exc
+    finally:
+        if source_fd is not None:
+            os.close(source_fd)
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+    if len(data) > MAX_PUBLIC_FRAME_BYTES:
+        raise DrawingReviewError(f'public frame too large: {name}')
+    actual = 'sha256:' + hashlib.sha256(data).hexdigest()
+    if actual != expected_sha256:
+        raise DrawingReviewError(f'public frame changed since validation: {name}')
+    return data
 
 
 def source_replay(episode: Path) -> dict:
@@ -201,6 +253,7 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
     return {
         'label': label, 'episode': episode, 'replay_report': Path(replay_report).resolve(),
         'frame_names': frame_names,
+        'frame_hashes': [files[name] for name in frame_names],
         'record': {
             'label': label, 'source_format': manifest['format'],
             'request_id': result['request_id'], 'seed': request.get('seed'),
@@ -257,10 +310,21 @@ def create_review_pack(sessions: list[tuple[str, Path, Path]], out: Path) -> dic
     for session in validated:
         label = session['label']
         images = {}
-        for key, filename in zip(('initial', 'intermediate', 'final'), session['frame_names'], strict=True):
+        for key, filename, expected in zip(
+            ('initial', 'intermediate', 'final'),
+            session['frame_names'], session['frame_hashes'], strict=True
+        ):
+            # Reopen safely by file descriptors, then validate the bytes actually
+            # read against the original manifest *before* any public write.
+            snapshot = verified_frame_snapshot(session['episode'], filename, expected)
             target = out / f'{label}-{key}.png'
-            shutil.copyfile(session['episode'] / filename, target)
-            images[key] = {'file': target.name, 'sha256': sha256(target), 'source_sha256': sha256(session['episode'] / filename)}
+            with target.open('xb') as destination:
+                destination.write(snapshot)
+            images[key] = {
+                'file': target.name,
+                'sha256': expected,
+                'source_sha256': expected,
+            }
         records.append({**session['record'], 'images': images})
     pack = {'format': FORMAT, 'sessions': records,
             'claims': {'visualized_real_source_episode': True,
