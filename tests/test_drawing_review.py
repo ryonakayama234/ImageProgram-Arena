@@ -1,5 +1,6 @@
 import hashlib
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,7 +31,7 @@ def fixture(root):
     ep.mkdir()
     paths = {
         'request.json': jsonb({'request_id': 'draw1', 'seed': 17, 'body': {'tools': ['pen']}, 'goal': {'prompt': 'one'}}),
-        'result.json': jsonb({'request_id': 'draw1', 'accepted_actions': 4, 'status': 'program_exhausted', 'stop_reason': 'done', 'final_state_hash': 'state-final-test', 'versions': {'world': 'v0'}, 'costs': {'motor_commands': 4}}),
+        'result.json': jsonb({'request_id': 'draw1', 'accepted_actions': 4, 'status': 'program_exhausted', 'stop_reason': 'done', 'initial_state_hash': 'state-initial-test', 'final_state_hash': 'state-final-test', 'versions': {'world': 'v0'}, 'costs': {'motor_commands': 4}}),
         'program.json': b'{}\n', 'initial_observation.json': b'{}\n', 'transitions.jsonl': b'{}\n',
         'frames/000000.png': b'\x89PNG\r\n\x1a\nA',
         'frames/000001.png': b'\x89PNG\r\n\x1a\nB',
@@ -93,6 +94,47 @@ class DrawingReviewTests(unittest.TestCase):
             write(episode, 'manifest.json', jsonb(manifest))
             with self.assertRaisesRegex(DrawingReviewError, 'public/private'):
                 create_review_pack([('first', episode, replay)], root / 'pack')
+
+    def test_parent_folder_symlink_to_private_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            (episode / 'private' / 'frames').parent.mkdir(exist_ok=True)
+            shutil.move(str(episode / 'frames'), str(episode / 'private' / 'frames'))
+            (episode / 'frames').symlink_to('private/frames', target_is_directory=True)
+            with self.assertRaisesRegex(DrawingReviewError, 'symlink'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+            self.assertFalse((root / 'pack').exists())
+
+    def test_duplicate_episode_different_labels_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            with self.assertRaisesRegex(DrawingReviewError, 'duplicate episode'):
+                create_review_pack([('baseline', episode, replay), ('variant', episode, replay)],
+                                   root / 'pack')
+            self.assertFalse((root / 'pack').exists())
+
+    def test_copied_episode_is_not_independent_comparison(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            duplicate = root / 'copied'
+            shutil.copytree(episode, duplicate)
+            with self.assertRaisesRegex(DrawingReviewError, 'duplicate episode identity'):
+                create_review_pack([('baseline', episode, replay), ('variant', duplicate, replay)],
+                                   root / 'pack')
+
+    def test_swapped_replay_attestation_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            write(root, 'replay.json', jsonb({
+                'verified': True, 'transitions': 4, 'final_state_hash': 'other-session',
+                'status': 'program_exhausted', 'goal_evaluated': False}))
+            with self.assertRaisesRegex(DrawingReviewError, 'attestation'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+            self.assertFalse((root / 'pack').exists())
 
     def test_symlink_and_duplicate_labels_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
