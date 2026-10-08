@@ -93,6 +93,37 @@ def canonical_json_hash(path: Path, *, omit_request_id: bool = False) -> str:
     return 'sha256:' + hashlib.sha256(canonical).hexdigest()
 
 
+
+def canonical_jsonl_hash(path: Path) -> str:
+    """Semantic identity of ordered JSONL records, not their byte formatting.
+
+    Boundaries are preserved with a newline after each canonical JSON object;
+    string newlines are escaped by JSON encoding. The original file digest is
+    retained separately for manifest integrity and artifact provenance.
+    """
+    digest = hashlib.sha256()
+    try:
+        with path.open(encoding='utf-8') as source:
+            for line_number, line in enumerate(source, start=1):
+                try:
+                    record = json.loads(line)
+                    if not isinstance(record, dict):
+                        raise ValueError('expected JSON object')
+                    canonical = json.dumps(
+                        record, ensure_ascii=False, sort_keys=True,
+                        separators=(',', ':'), allow_nan=False,
+                    ).encode('utf-8')
+                except (ValueError, UnicodeError) as exc:
+                    raise DrawingReviewError(
+                        f'invalid transition JSONL record at line {line_number}'
+                    ) from exc
+                digest.update(canonical)
+                digest.update(b'\n')
+    except OSError as exc:
+        raise DrawingReviewError('cannot read transition JSONL') from exc
+    return 'sha256:' + digest.hexdigest()
+
+
 def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
     if not LABEL.fullmatch(label):
         raise DrawingReviewError('label must be a short ASCII slug')
@@ -183,6 +214,9 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
             ),
             'source_program_semantic_hash': canonical_json_hash(episode / 'program.json'),
             'source_transition_sha256': files['transitions.jsonl'],
+            'source_transition_semantic_hash': canonical_jsonl_hash(
+                episode / 'transitions.jsonl'
+            ),
             'source_initial_frame_sha256': files['frames/000000.png'],
             'fresh_source_replay_verified': True,
             'status': result.get('status'), 'stop_reason': result.get('stop_reason'),
@@ -211,7 +245,7 @@ def create_review_pack(sessions: list[tuple[str, Path, Path]], out: Path) -> dic
          item['record']['source_program_semantic_hash'],
          item['record']['initial_state_hash'],
          item['record']['final_state_hash'],
-         item['record']['source_transition_sha256'],
+         item['record']['source_transition_semantic_hash'],
          item['record']['source_initial_frame_sha256'])
         for item in validated
     ]
