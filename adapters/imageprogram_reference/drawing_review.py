@@ -60,7 +60,35 @@ def safe_public_path(root: Path, name: str) -> Path:
             raise DrawingReviewError(f'symlinked public artifact component: {name}')
     if not path.resolve().is_relative_to(root.resolve()) or not path.is_file():
         raise DrawingReviewError(f'missing or escaping artifact: {name}')
+    # A hard link to any hidden file has the same inode and cannot be detected
+    # by is_symlink(). Fail closed on multiply linked public inputs.
+    if path.stat().st_nlink != 1:
+        raise DrawingReviewError(f'hard-linked public artifact: {name}')
     return path
+
+
+def source_replay(episode: Path) -> dict:
+    """Re-run exactly this episode with the version-pinned ImageProgram engine."""
+    try:
+        from imageprogram.experiments.runner import replay
+    except ImportError as exc:
+        raise DrawingReviewError(
+            'ImageProgram must be installed to verify source replay'
+        ) from exc
+    result = replay(episode)
+    if not isinstance(result, dict):
+        raise DrawingReviewError('source replay returned an invalid report')
+    return result
+
+
+def canonical_json_hash(path: Path) -> str:
+    """Identity of structured source inputs, ignoring cosmetic JSON whitespace."""
+    payload = read_json(path)
+    canonical = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'),
+        allow_nan=False,
+    ).encode('utf-8')
+    return 'sha256:' + hashlib.sha256(canonical).hexdigest()
 
 
 def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
@@ -120,6 +148,16 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
             or replay.get('status') != result.get('status')
             or replay.get('goal_evaluated') is not False):
         raise DrawingReviewError('replay attestation does not match this episode')
+    # The supplied JSON alone cannot bind an episode's input files. Replay the
+    # selected episode again using ImageProgram's real execution engine. Its
+    # replay() checks request, program, state transitions, frames and versions.
+    fresh = source_replay(episode)
+    if (fresh.get('verified') is not True
+            or fresh.get('transitions') != n
+            or fresh.get('final_state_hash') != result['final_state_hash']
+            or fresh.get('status') != result['status']
+            or fresh.get('goal_evaluated') is not False):
+        raise DrawingReviewError('fresh source replay disagrees with this episode')
     # A replay report is only an attestation from ImageProgram. Do not claim
     # that an independent Arena physics replay has taken place.
     return {
@@ -133,6 +171,11 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
             'final_state_hash': result['final_state_hash'],
             'source_request_sha256': files['request.json'],
             'source_program_sha256': files['program.json'],
+            'source_request_semantic_hash': canonical_json_hash(episode / 'request.json'),
+            'source_program_semantic_hash': canonical_json_hash(episode / 'program.json'),
+            'source_transition_sha256': files['transitions.jsonl'],
+            'source_initial_frame_sha256': files['frames/000000.png'],
+            'fresh_source_replay_verified': True,
             'status': result.get('status'), 'stop_reason': result.get('stop_reason'),
             'accepted_actions': n, 'costs': result.get('costs'),
             'versions': result['versions'], 'replay_attested_by_source': True,
@@ -155,10 +198,12 @@ def create_review_pack(sessions: list[tuple[str, Path, Path]], out: Path) -> dic
     # Identical deterministic source runs are not independent comparisons, even
     # when copied to different folders or re-run with new wall-time metadata.
     identities = [
-        (item['record']['source_request_sha256'],
-         item['record']['source_program_sha256'],
+        (item['record']['source_request_semantic_hash'],
+         item['record']['source_program_semantic_hash'],
          item['record']['initial_state_hash'],
-         item['record']['final_state_hash'])
+         item['record']['final_state_hash'],
+         item['record']['source_transition_sha256'],
+         item['record']['source_initial_frame_sha256'])
         for item in validated
     ]
     if len(set(identities)) != len(identities):
