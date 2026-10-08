@@ -50,7 +50,7 @@ def fixture(root):
         'result_sha256': digest(paths['result.json']),
     }
     write(ep, 'manifest.json', jsonb(manifest))
-    rp = write(root, 'replay.json', jsonb({'verified': True}))
+    rp = write(root, 'replay.json', jsonb({'verified': True, 'transitions': 4, 'final_state_hash': 'state-final-test', 'status': 'program_exhausted', 'goal_evaluated': False}))
     return ep, rp
 
 
