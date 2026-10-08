@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from adapters.imageprogram_reference.drawing_review import (
     DrawingReviewError,
+    canonical_jsonl_hash,
     create_review_pack,
 )
 
@@ -226,6 +227,20 @@ class DrawingReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(DrawingReviewError, 'duplicate episode identity'):
                 create_review_pack([('baseline', episode, replay),
                                     ('variant', duplicate, replay)], root / 'pack')
+
+    def test_canonical_jsonl_preserves_transition_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            forward = write(root, 'forward.jsonl', b'{"step":1}\n{"step":2}\n')
+            reverse = write(root, 'reverse.jsonl', b'{"step":2}\n{"step":1}\n')
+            self.assertNotEqual(canonical_jsonl_hash(forward), canonical_jsonl_hash(reverse))
+
+    def test_invalid_jsonl_record_is_not_silently_ignored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            invalid = write(root, 'bad.jsonl', b'{"step":1}\n   \n')
+            with self.assertRaisesRegex(DrawingReviewError, 'JSONL record at line 2'):
+                canonical_jsonl_hash(invalid)
 
     def test_report_cannot_replace_fresh_source_replay(self):
         with tempfile.TemporaryDirectory() as tmp:
