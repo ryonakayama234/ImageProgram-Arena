@@ -42,6 +42,8 @@ def safe_public_path(root: Path, name: str) -> Path:
     if not isinstance(name, str) or not name or '\\' in name:
         raise DrawingReviewError('invalid public artifact path')
     relative = Path(name)
+    if relative.as_posix() != name:
+        raise DrawingReviewError('non-canonical public artifact path')
     if (relative.is_absolute() or '..' in relative.parts or '.' in relative.parts
             or any(part.startswith('.') for part in relative.parts)):
         raise DrawingReviewError('unsafe public artifact path')
