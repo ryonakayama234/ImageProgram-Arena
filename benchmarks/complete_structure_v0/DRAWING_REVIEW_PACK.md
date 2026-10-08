@@ -33,6 +33,7 @@ Open `runs/a0-first-review/index.html` locally. It displays real **initial / int
 
 - Verify all source **public** file hashes and manifest public/private list before any output is created.
 - Block traversal, noncanonical path aliases, symbolic links and multiply linked public input files (including private hard links); never copy a private checkpoint or hidden witness to the review pack.
+- After potentially long source replay, **re-open every PNG through no-follow directory/file descriptors**, reject non-regular/multiply-linked files, and verify the actual snapshotted bytes against the earlier manifest digest **before writing them** to the public Review Pack. The 64 MiB/frame limit prevents unbounded image snapshot memory use. This closes the post-replay path-swap TOCTOU leak; validation alone is not a safe copy primitive.
 - Require an ImageProgram `verified=true` replay report **and independently invoke the installed ImageProgram `replay(episode)` on the selected episode**. This reconstructs the recorded request/program and checks the frames/transitions with the source's pinned implementation. This is not a separately implemented Arena physics engine. A report from another episode cannot substitute for direct source replay.
 - Never label the scripted Character witness as learned construction, better ranking, or acquired Skill.
 - Review Pack files are locally generated, not inserted into Git; store the reproducible source/command/decisions separately.
@@ -44,4 +45,4 @@ Open `runs/a0-first-review/index.html` locally. It displays real **initial / int
 python -m unittest -v tests.test_drawing_review
 ```
 
-Tests include success from a mock manifest and fail-closed tampering, replay failure, private exposure, symlink and duplicate names. Mock fixtures validate the consumer interface only; the **first real Character v0 episode** must still be generated and inspected before #13 is closed.
+Tests include success from a mock manifest and fail-closed tampering, replay failure, private exposure, symlink and duplicate names. Adversarial tests also mutate an image or its parent directory after replay / just before descriptor open, and ensure nothing from the private tree is exported. Mock fixtures validate the consumer interface only; the **first real Character v0 episode** must still be generated and inspected before #13 is closed.
