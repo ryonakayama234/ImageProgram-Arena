@@ -187,6 +187,46 @@ class DrawingReviewTests(unittest.TestCase):
                 create_review_pack([('baseline', episode, replay), ('variant', duplicate, replay)],
                                    root / 'pack')
 
+    def test_transition_jsonl_formatting_cannot_make_duplicate_unique(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            duplicate = root / 'copied'
+            shutil.copytree(episode, duplicate)
+            # This changes file bytes but not the ordered transition record.
+            write(duplicate, 'transitions.jsonl', b'{   }  \n')
+            manifest = json.loads((duplicate / 'manifest.json').read_text())
+            manifest['files']['transitions.jsonl'] = digest(
+                (duplicate / 'transitions.jsonl').read_bytes()
+            )
+            write(duplicate, 'manifest.json', jsonb(manifest))
+            with self.assertRaisesRegex(DrawingReviewError, 'duplicate episode identity'):
+                create_review_pack([('baseline', episode, replay),
+                                    ('variant', duplicate, replay)], root / 'pack')
+            self.assertFalse((root / 'pack').exists())
+
+    def test_transition_jsonl_key_order_cannot_make_duplicate_unique(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            write(episode, 'transitions.jsonl', b'{"step": 1, "action": "stroke"}\n')
+            source_manifest = json.loads((episode / 'manifest.json').read_text())
+            source_manifest['files']['transitions.jsonl'] = digest(
+                (episode / 'transitions.jsonl').read_bytes()
+            )
+            write(episode, 'manifest.json', jsonb(source_manifest))
+            duplicate = root / 'copied'
+            shutil.copytree(episode, duplicate)
+            write(duplicate, 'transitions.jsonl', b'{ "action":"stroke", "step":1 }\n')
+            manifest = json.loads((duplicate / 'manifest.json').read_text())
+            manifest['files']['transitions.jsonl'] = digest(
+                (duplicate / 'transitions.jsonl').read_bytes()
+            )
+            write(duplicate, 'manifest.json', jsonb(manifest))
+            with self.assertRaisesRegex(DrawingReviewError, 'duplicate episode identity'):
+                create_review_pack([('baseline', episode, replay),
+                                    ('variant', duplicate, replay)], root / 'pack')
+
     def test_report_cannot_replace_fresh_source_replay(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
