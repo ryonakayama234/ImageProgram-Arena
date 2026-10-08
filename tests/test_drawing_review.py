@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from adapters.imageprogram_reference.drawing_review import (
     DrawingReviewError,
@@ -55,7 +56,25 @@ def fixture(root):
     return ep, rp
 
 
+def fake_source_replay(episode):
+    # Isolated consumer test fixture, not an ImageProgram World replay.
+    result = json.loads((Path(episode) / 'result.json').read_text())
+    return {
+        'verified': True, 'transitions': result['accepted_actions'],
+        'final_state_hash': result['final_state_hash'],
+        'status': result['status'], 'goal_evaluated': False,
+    }
+
+
 class DrawingReviewTests(unittest.TestCase):
+    def setUp(self):
+        patcher = patch(
+            'adapters.imageprogram_reference.drawing_review.source_replay',
+            side_effect=fake_source_replay,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_create_pack(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -93,6 +112,43 @@ class DrawingReviewTests(unittest.TestCase):
             manifest['sites_files'].append('private/final.npz')
             write(episode, 'manifest.json', jsonb(manifest))
             with self.assertRaisesRegex(DrawingReviewError, 'public/private'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+
+    def test_hard_link_to_private_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            frame = episode / 'frames' / '000002.png'
+            frame.unlink()
+            frame.hardlink_to(episode / 'private' / 'final.npz')
+            manifest = json.loads((episode / 'manifest.json').read_text())
+            manifest['files']['frames/000002.png'] = digest(frame.read_bytes())
+            write(episode, 'manifest.json', jsonb(manifest))
+            with self.assertRaisesRegex(DrawingReviewError, 'hard-linked'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+
+    def test_json_whitespace_cannot_make_copied_episode_unique(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            duplicate = root / 'copied'
+            shutil.copytree(episode, duplicate)
+            write(duplicate, 'program.json', b'{ } \n')
+            manifest = json.loads((duplicate / 'manifest.json').read_text())
+            manifest['files']['program.json'] = digest((duplicate / 'program.json').read_bytes())
+            write(duplicate, 'manifest.json', jsonb(manifest))
+            with self.assertRaisesRegex(DrawingReviewError, 'duplicate episode identity'):
+                create_review_pack([('baseline', episode, replay), ('variant', duplicate, replay)],
+                                   root / 'pack')
+
+    def test_report_cannot_replace_fresh_source_replay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            with patch(
+                'adapters.imageprogram_reference.drawing_review.source_replay',
+                return_value={'verified': False},
+            ), self.assertRaisesRegex(DrawingReviewError, 'fresh source replay'):
                 create_review_pack([('first', episode, replay)], root / 'pack')
 
     def test_noncanonical_frame_alias_is_rejected(self):
