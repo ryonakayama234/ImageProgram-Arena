@@ -96,6 +96,11 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
     replay = read_json(Path(replay_report))
     if replay.get('verified') is not True:
         raise DrawingReviewError('ImageProgram replay is not verified')
+    if (replay.get('transitions') != n
+            or replay.get('final_state_hash') != result.get('final_state_hash')
+            or replay.get('status') != result.get('status')
+            or replay.get('goal_evaluated') is not False):
+        raise DrawingReviewError('replay attestation does not match this episode')
     # A replay report is only an attestation from ImageProgram. Do not claim
     # that an independent Arena physics replay has taken place.
     return {
