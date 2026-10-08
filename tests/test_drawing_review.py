@@ -88,6 +88,91 @@ class DrawingReviewTests(unittest.TestCase):
             self.assertNotIn('secret', (root / 'pack' / 'review.json').read_text())
             self.assertTrue((root / 'pack' / 'index.html').exists())
 
+    def test_frame_swapped_to_private_symlink_after_replay_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            private = (episode / 'private' / 'final.npz').read_bytes()
+
+            def swap_during_source_replay(selected):
+                report = fake_source_replay(selected)
+                frame = episode / 'frames' / '000002.png'
+                frame.unlink()
+                frame.symlink_to('../private/final.npz')
+                return report
+
+            with patch(
+                'adapters.imageprogram_reference.drawing_review.source_replay',
+                side_effect=swap_during_source_replay,
+            ), self.assertRaises(DrawingReviewError):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+            output = root / 'pack'
+            if output.exists():
+                self.assertFalse(any(p.read_bytes() == private for p in
+                                     output.glob('*.png')))
+
+    def test_parent_frames_symlink_swap_after_replay_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            private = episode / 'private'
+            (private / 'frames').parent.mkdir(exist_ok=True)
+
+            def swap_during_source_replay(selected):
+                report = fake_source_replay(selected)
+                shutil.move(str(episode / 'frames'), str(private / 'frames'))
+                (episode / 'frames').symlink_to('private/frames', target_is_directory=True)
+                return report
+
+            with patch(
+                'adapters.imageprogram_reference.drawing_review.source_replay',
+                side_effect=swap_during_source_replay,
+            ), self.assertRaises(DrawingReviewError):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+
+    def test_modified_regular_frame_after_replay_fails_digest_before_copy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+
+            def overwrite_during_source_replay(selected):
+                report = fake_source_replay(selected)
+                write(episode, 'final.png', b'changed-after-source-replay')
+                return report
+
+            with patch(
+                'adapters.imageprogram_reference.drawing_review.source_replay',
+                side_effect=overwrite_during_source_replay,
+            ), self.assertRaisesRegex(DrawingReviewError, 'changed since validation'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+            self.assertFalse((root / 'pack' / 'first-final.png').exists())
+
+    def test_swap_between_path_check_and_fd_open_cannot_export_private(self):
+        # Force the swap at the last gap: after safe_public_path succeeds
+        # during the secure snapshot but before os.open(O_NOFOLLOW).
+        from adapters.imageprogram_reference.drawing_review import safe_public_path
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            attacked = [False]
+
+            def raced_check(source_root, filename):
+                path = safe_public_path(source_root, filename)
+                if (filename == 'frames/000002.png'
+                        and (root / 'pack').exists() and not attacked[0]):
+                    attacked[0] = True
+                    path.unlink()
+                    path.symlink_to('../private/final.npz')
+                return path
+
+            with patch(
+                'adapters.imageprogram_reference.drawing_review.safe_public_path',
+                side_effect=raced_check,
+            ), self.assertRaises(DrawingReviewError):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+            self.assertTrue(attacked[0])
+            self.assertFalse((root / 'pack' / 'first-intermediate.png').exists())
+
     def test_replay_is_required(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
