@@ -95,6 +95,25 @@ class DrawingReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(DrawingReviewError, 'public/private'):
                 create_review_pack([('first', episode, replay)], root / 'pack')
 
+    def test_noncanonical_frame_alias_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            for alias in ('frames//000002.png', 'frames/./000002.png'):
+                manifest = json.loads((episode / 'manifest.json').read_text())
+                manifest['files'][alias] = manifest['files']['frames/000002.png']
+                manifest['sites_files'].append(alias)
+                write(episode, 'manifest.json', jsonb(manifest))
+                with self.subTest(alias=alias), self.assertRaisesRegex(
+                    DrawingReviewError, 'non-canonical'
+                ):
+                    create_review_pack([('first', episode, replay)], root / 'pack')
+                self.assertFalse((root / 'pack').exists())
+                # Restore the source manifest between subtests.
+                manifest['files'].pop(alias)
+                manifest['sites_files'].remove(alias)
+                write(episode, 'manifest.json', jsonb(manifest))
+
     def test_parent_folder_symlink_to_private_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
