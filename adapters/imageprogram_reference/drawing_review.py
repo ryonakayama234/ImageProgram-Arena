@@ -81,9 +81,11 @@ def source_replay(episode: Path) -> dict:
     return result
 
 
-def canonical_json_hash(path: Path) -> str:
-    """Identity of structured source inputs, ignoring cosmetic JSON whitespace."""
+def canonical_json_hash(path: Path, *, omit_request_id: bool = False) -> str:
+    """Semantic identity without cosmetic formatting or administrative run IDs."""
     payload = read_json(path)
+    if omit_request_id:
+        payload = {key: value for key, value in payload.items() if key != 'request_id'}
     canonical = json.dumps(
         payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'),
         allow_nan=False,
@@ -176,7 +178,9 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
             'final_state_hash': result['final_state_hash'],
             'source_request_sha256': files['request.json'],
             'source_program_sha256': files['program.json'],
-            'source_request_semantic_hash': canonical_json_hash(episode / 'request.json'),
+            'source_request_semantic_hash': canonical_json_hash(
+                episode / 'request.json', omit_request_id=True
+            ),
             'source_program_semantic_hash': canonical_json_hash(episode / 'program.json'),
             'source_transition_sha256': files['transitions.jsonl'],
             'source_initial_frame_sha256': files['frames/000000.png'],
