@@ -30,7 +30,7 @@ def fixture(root):
     ep.mkdir()
     paths = {
         'request.json': jsonb({'request_id': 'draw1', 'seed': 17, 'body': {'tools': ['pen']}, 'goal': {'prompt': 'one'}}),
-        'result.json': jsonb({'request_id': 'draw1', 'accepted_actions': 4, 'status': 'program_exhausted', 'stop_reason': 'done', 'versions': {'world': 'v0'}, 'costs': {'motor_commands': 4}}),
+        'result.json': jsonb({'request_id': 'draw1', 'accepted_actions': 4, 'status': 'program_exhausted', 'stop_reason': 'done', 'final_state_hash': 'state-final-test', 'versions': {'world': 'v0'}, 'costs': {'motor_commands': 4}}),
         'program.json': b'{}\n', 'initial_observation.json': b'{}\n', 'transitions.jsonl': b'{}\n',
         'frames/000000.png': b'\x89PNG\r\n\x1a\nA',
         'frames/000001.png': b'\x89PNG\r\n\x1a\nB',
