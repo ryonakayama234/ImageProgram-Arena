@@ -49,16 +49,27 @@ def safe_public_path(root: Path, name: str) -> Path:
                                         and relative.parts[0] == 'frames'
                                         and re.fullmatch(r'\d{6}\.png', relative.name)):
         raise DrawingReviewError('non-public or unrecognized artifact path')
-    path = root / relative
-    if not path.resolve().is_relative_to(root.resolve()) or path.is_symlink() or not path.is_file():
-        raise DrawingReviewError(f'missing, symlinked, or escaping artifact: {name}')
+    # An in-tree 'frames' symlink to 'private/frames' resolves inside root.
+    # Check *every* prefix, not only the leaf or final resolved location.
+    path = root
+    for part in relative.parts:
+        path = path / part
+        if path.is_symlink():
+            raise DrawingReviewError(f'symlinked public artifact component: {name}')
+    if not path.resolve().is_relative_to(root.resolve()) or not path.is_file():
+        raise DrawingReviewError(f'missing or escaping artifact: {name}')
     return path
 
 
 def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
     if not LABEL.fullmatch(label):
         raise DrawingReviewError('label must be a short ASCII slug')
-    episode = Path(episode).resolve()
+    episode = Path(episode)
+    if episode.is_symlink():
+        raise DrawingReviewError('episode root must not be a symlink')
+    episode = episode.resolve()
+    if (episode / 'manifest.json').is_symlink():
+        raise DrawingReviewError('manifest must not be a symlink')
     manifest = read_json(episode / 'manifest.json')
     if manifest.get('format') != 'imageprogram-episode-1':
         raise DrawingReviewError('unsupported ImageProgram episode format')
@@ -93,6 +104,12 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
         raise DrawingReviewError('request/result ID mismatch')
     if not isinstance(result.get('versions'), dict) or not result['versions']:
         raise DrawingReviewError('runtime versions missing')
+    if not isinstance(result.get('initial_state_hash'), str) or not result['initial_state_hash']:
+        raise DrawingReviewError('initial state identity missing')
+    if not isinstance(result.get('final_state_hash'), str) or not result['final_state_hash']:
+        raise DrawingReviewError('final state identity missing')
+    if Path(replay_report).is_symlink():
+        raise DrawingReviewError('replay attestation must not be a symlink')
     replay = read_json(Path(replay_report))
     if replay.get('verified') is not True:
         raise DrawingReviewError('ImageProgram replay is not verified')
@@ -110,6 +127,10 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
             'label': label, 'source_format': manifest['format'],
             'request_id': result['request_id'], 'seed': request.get('seed'),
             'body': request.get('body'), 'goal': request.get('goal'),
+            'initial_state_hash': result['initial_state_hash'],
+            'final_state_hash': result['final_state_hash'],
+            'source_request_sha256': files['request.json'],
+            'source_program_sha256': files['program.json'],
             'status': result.get('status'), 'stop_reason': result.get('stop_reason'),
             'accepted_actions': n, 'costs': result.get('costs'),
             'versions': result['versions'], 'replay_attested_by_source': True,
@@ -127,6 +148,19 @@ def create_review_pack(sessions: list[tuple[str, Path, Path]], out: Path) -> dic
     if len(labels) != len(set(labels)):
         raise DrawingReviewError('session labels must be unique')
     validated = [validate_session(*session) for session in sessions]
+    if len({item['episode'] for item in validated}) != len(validated):
+        raise DrawingReviewError('duplicate episode path across session labels')
+    # Identical deterministic source runs are not independent comparisons, even
+    # when copied to different folders or re-run with new wall-time metadata.
+    identities = [
+        (item['record']['source_request_sha256'],
+         item['record']['source_program_sha256'],
+         item['record']['initial_state_hash'],
+         item['record']['final_state_hash'])
+        for item in validated
+    ]
+    if len(set(identities)) != len(identities):
+        raise DrawingReviewError('duplicate episode identity across sessions')
     out = Path(out)
     out.mkdir(parents=True, exist_ok=False)
     records = []
