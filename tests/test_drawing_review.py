@@ -152,6 +152,27 @@ class DrawingReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(DrawingReviewError, 'hard-linked'):
                 create_review_pack([('first', episode, replay)], root / 'pack')
 
+    def test_request_id_relabel_cannot_make_episode_unique(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            duplicate = root / 'copied'
+            shutil.copytree(episode, duplicate)
+            request = json.loads((duplicate / 'request.json').read_text())
+            request['request_id'] = 'new-label-only'
+            result = json.loads((duplicate / 'result.json').read_text())
+            result['request_id'] = 'new-label-only'
+            write(duplicate, 'request.json', jsonb(request))
+            write(duplicate, 'result.json', jsonb(result))
+            manifest = json.loads((duplicate / 'manifest.json').read_text())
+            for name in ('request.json', 'result.json'):
+                manifest['files'][name] = digest((duplicate / name).read_bytes())
+            manifest['result_sha256'] = manifest['files']['result.json']
+            write(duplicate, 'manifest.json', jsonb(manifest))
+            with self.assertRaisesRegex(DrawingReviewError, 'duplicate episode identity'):
+                create_review_pack([('baseline', episode, replay), ('variant', duplicate, replay)],
+                                   root / 'pack')
+
     def test_json_whitespace_cannot_make_copied_episode_unique(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
