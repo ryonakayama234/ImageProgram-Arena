@@ -127,9 +127,14 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
     if type(n) is not int or n < 2 or n > 1_000_000:
         raise DrawingReviewError('requires a completed multi-action episode')
     middle = n // 2
+    terminal_frame = f'frames/{n:06d}.png'
     frame_names = ['frames/000000.png', f'frames/{middle:06d}.png', 'final.png']
-    if any(name not in public for name in frame_names):
-        raise DrawingReviewError('initial/mid/final frames missing from manifest')
+    if any(name not in public for name in (*frame_names, terminal_frame)):
+        raise DrawingReviewError('initial/mid/terminal/final frames missing from manifest')
+    if files['final.png'] != files[terminal_frame]:
+        raise DrawingReviewError('final.png does not match terminal numbered frame')
+    if result.get('status') not in {'program_exhausted', 'budget_exhausted', 'failed'}:
+        raise DrawingReviewError('missing or invalid terminal execution status')
     if result.get('request_id') != request.get('request_id'):
         raise DrawingReviewError('request/result ID mismatch')
     if not isinstance(result.get('versions'), dict) or not result['versions']:
