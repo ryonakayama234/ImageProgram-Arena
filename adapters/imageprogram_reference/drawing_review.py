@@ -14,12 +14,15 @@ import json
 import os
 import re
 import stat
+import tempfile
 from pathlib import Path
 
 FORMAT = 'arena-drawing-review-v0'
 MAX_PUBLIC_FRAME_BYTES = 64 * 1024 * 1024
 MAX_PUBLIC_METADATA_BYTES = 4 * 1024 * 1024
 MAX_PUBLIC_TRANSITIONS_BYTES = 128 * 1024 * 1024
+MAX_PRIVATE_REPLAY_BYTES = 256 * 1024 * 1024
+MAX_REPLAY_SNAPSHOT_BYTES = 1024 * 1024 * 1024
 LABEL = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,47}$')
 PUBLIC_TOP = {'request.json', 'program.json', 'initial_observation.json',
               'transitions.jsonl', 'result.json', 'final.png', 'rejected_action.json'}
@@ -98,7 +101,8 @@ def _read_bounded_regular_fd(fd: int, name: str, limit: int) -> bytes:
 
 
 def _public_snapshot(
-    root: Path, name: str, limit: int, *, manifest: bool = False
+    root: Path, name: str, limit: int, *, manifest: bool = False,
+    private: bool = False
 ) -> bytes:
     """Read a bounded immutable byte snapshot with no-follow for every component.
 
@@ -109,6 +113,15 @@ def _public_snapshot(
     if manifest:
         if name != 'manifest.json':
             raise DrawingReviewError('unsupported management artifact')
+    elif private:
+        # Management checkpoints are never copied to the public Review Pack.
+        # The private snapshot is used only by an isolated source replay.
+        relative = Path(name) if isinstance(name, str) else Path()
+        if (not isinstance(name, str) or relative.as_posix() != name
+                or len(relative.parts) < 2 or relative.parts[0] != 'private'
+                or '\\' in name or any(part in {'.', '..'} or part.startswith('.')
+                                     for part in relative.parts)):
+            raise DrawingReviewError('invalid private replay artifact path')
     else:
         safe_public_path(root, name)
     relative = Path(name)
@@ -176,6 +189,45 @@ def source_replay(episode: Path) -> dict:
     if not isinstance(result, dict):
         raise DrawingReviewError('source replay returned an invalid report')
     return result
+
+
+def _snapshot_and_source_replay(
+    episode: Path, manifest_bytes: bytes, files: dict[str, str]
+) -> dict:
+    """Replay an immutable, digest-verified private copy of exactly this episode.
+
+    Replaying a source pathname after metadata validation is unsafe: a renamed
+    episode root can point replay at another valid episode with identical
+    terminal summary fields. Never use the unpinned source directory for replay.
+    The scratch copy (including private checkpoints) is deleted before return
+    and is never part of the public Review Pack.
+    """
+    total_bytes = len(manifest_bytes)
+    with tempfile.TemporaryDirectory(prefix='arena-source-replay-') as temp:
+        replay_root = Path(temp)
+        for name, digest in files.items():
+            is_private = isinstance(name, str) and name.startswith('private/')
+            if is_private:
+                limit = MAX_PRIVATE_REPLAY_BYTES
+            elif isinstance(name, str) and name.endswith('.png'):
+                limit = MAX_PUBLIC_FRAME_BYTES
+            elif name == 'transitions.jsonl':
+                limit = MAX_PUBLIC_TRANSITIONS_BYTES
+            else:
+                limit = MAX_PUBLIC_METADATA_BYTES
+            if not isinstance(name, str):
+                raise DrawingReviewError('invalid source episode artifact path')
+            data = _public_snapshot(episode, name, limit, private=is_private)
+            if not isinstance(digest, str) or sha256_bytes(data) != digest:
+                raise DrawingReviewError(f'artifact digest mismatch: {name}')
+            total_bytes += len(data)
+            if total_bytes > MAX_REPLAY_SNAPSHOT_BYTES:
+                raise DrawingReviewError('episode too large for pinned source replay')
+            destination = replay_root.joinpath(*Path(name).parts)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(data)
+        (replay_root / 'manifest.json').write_bytes(manifest_bytes)
+        return source_replay(replay_root)
 
 
 def canonical_json_hash(path: Path | bytes, *, omit_request_id: bool = False) -> str:
@@ -298,10 +350,9 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
             or replay.get('status') != result.get('status')
             or replay.get('goal_evaluated') is not False):
         raise DrawingReviewError('replay attestation does not match this episode')
-    # The supplied JSON alone cannot bind an episode's input files. Replay the
-    # selected episode again using ImageProgram's real execution engine. Its
-    # replay() checks request, program, state transitions, frames and versions.
-    fresh = source_replay(episode)
+    # Replay only a private, immutable digest-verified snapshot, so a
+    # directory rename after validation cannot change the attested episode.
+    fresh = _snapshot_and_source_replay(episode, manifest_bytes, files)
     if (fresh.get('verified') is not True
             or fresh.get('transitions') != n
             or fresh.get('final_state_hash') != result['final_state_hash']
