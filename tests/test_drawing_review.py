@@ -402,6 +402,58 @@ class DrawingReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(DrawingReviewError, 'JSONL record at line 2'):
                 canonical_jsonl_hash(invalid)
 
+    def test_source_replay_uses_pinned_snapshot_when_root_is_replaced(self):
+        # Two otherwise valid roots share frames and terminal summary fields
+        # but have different public requests. A rename during source replay
+        # must not attest the replacement as the originally verified episode.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            replacement = root / 'other_valid_episode'
+            shutil.copytree(episode, replacement)
+            req = json.loads((replacement / 'request.json').read_text())
+            req['seed'] = 999
+            write(replacement, 'request.json', jsonb(req))
+            manifest = json.loads((replacement / 'manifest.json').read_text())
+            manifest['files']['request.json'] = digest(
+                (replacement / 'request.json').read_bytes()
+            )
+            write(replacement, 'manifest.json', jsonb(manifest))
+
+            def swap_root_during_replay(selected):
+                # Source replay must receive the immutable, private copy;
+                # this selected path cannot be changed by swapping 'episode'.
+                self.assertNotEqual(Path(selected).resolve(), episode.resolve())
+                self.assertEqual(
+                    json.loads((Path(selected) / 'request.json').read_text())['seed'],
+                    17,
+                )
+                episode.rename(root / 'original_moved')
+                replacement.rename(episode)
+                self.assertEqual(
+                    json.loads((Path(selected) / 'request.json').read_text())['seed'],
+                    17,
+                )
+                return fake_source_replay(selected)
+
+            with patch(
+                'adapters.imageprogram_reference.drawing_review.source_replay',
+                side_effect=swap_root_during_replay,
+            ):
+                pack = create_review_pack([('baseline', episode, replay)], root / 'pack')
+            self.assertEqual(pack['sessions'][0]['seed'], 17)
+            self.assertTrue(pack['sessions'][0]['fresh_source_replay_verified'])
+
+    def test_private_checkpoint_symlink_is_not_followed_for_source_replay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            (episode / 'private/initial.npz').unlink()
+            (episode / 'private/initial.npz').symlink_to('final.npz')
+            with self.assertRaises(DrawingReviewError):
+                create_review_pack([('baseline', episode, replay)], root / 'pack')
+            self.assertFalse((root / 'pack').exists())
+
     def test_report_cannot_replace_fresh_source_replay(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
