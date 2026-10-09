@@ -173,6 +173,81 @@ class DrawingReviewTests(unittest.TestCase):
             self.assertTrue(attacked[0])
             self.assertFalse((root / 'pack' / 'first-intermediate.png').exists())
 
+    def test_metadata_symlink_swap_between_check_and_open_cannot_export_secrets(self):
+        from adapters.imageprogram_reference.drawing_review import safe_public_path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            private = write(episode, 'private/poison.json', jsonb({
+                'request_id': 'draw1', 'seed': 'TOP_SECRET',
+                'body': {'secret': 'CANARY'}, 'goal': {'secret': 'CANARY'},
+            }))
+            attacked = [False]
+
+            def raced_public_check(source_root, filename):
+                path = safe_public_path(source_root, filename)
+                if filename == 'request.json' and not attacked[0]:
+                    attacked[0] = True
+                    path.unlink()
+                    path.symlink_to('private/poison.json')
+                return path
+
+            with patch(
+                'adapters.imageprogram_reference.drawing_review.safe_public_path',
+                side_effect=raced_public_check,
+            ), self.assertRaises(DrawingReviewError):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+            self.assertTrue(attacked[0])
+            self.assertFalse((root / 'pack').exists())
+            self.assertIn(b'CANARY', private.read_bytes())
+
+    def test_metadata_changed_during_source_replay_uses_verified_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+
+            def poison_during_replay(selected):
+                report = fake_source_replay(selected)
+                request = json.loads((episode / 'request.json').read_text())
+                request['seed'] = 'PRIVATE_AFTER_CHECK'
+                request['body'] = {'secret': 'CANARY'}
+                write(episode, 'request.json', jsonb(request))
+                return report
+
+            with patch(
+                'adapters.imageprogram_reference.drawing_review.source_replay',
+                side_effect=poison_during_replay,
+            ):
+                pack = create_review_pack([('first', episode, replay)], root / 'pack')
+            record = pack['sessions'][0]
+            self.assertEqual(record['seed'], 17)
+            self.assertNotIn('CANARY', (root / 'pack' / 'review.json').read_text())
+            self.assertNotIn('PRIVATE_AFTER_CHECK',
+                             (root / 'pack' / 'review.json').read_text())
+
+    def test_oversized_public_frame_fails_before_unbounded_hashing(self):
+        from adapters.imageprogram_reference.drawing_review import MAX_PUBLIC_FRAME_BYTES
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            with (episode / 'frames' / '000002.png').open('r+b') as frame:
+                frame.truncate(MAX_PUBLIC_FRAME_BYTES + 1)
+            with self.assertRaisesRegex(DrawingReviewError, 'too large'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+            self.assertFalse((root / 'pack').exists())
+
+    def test_oversized_public_json_fails_before_unbounded_parsing(self):
+        from adapters.imageprogram_reference.drawing_review import MAX_PUBLIC_METADATA_BYTES
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            episode, replay = fixture(root)
+            with (episode / 'request.json').open('r+b') as request:
+                request.truncate(MAX_PUBLIC_METADATA_BYTES + 1)
+            with self.assertRaisesRegex(DrawingReviewError, 'too large'):
+                create_review_pack([('first', episode, replay)], root / 'pack')
+            self.assertFalse((root / 'pack').exists())
+
     def test_replay_is_required(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
