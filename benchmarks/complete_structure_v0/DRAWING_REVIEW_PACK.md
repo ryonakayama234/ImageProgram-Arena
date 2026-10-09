@@ -80,3 +80,16 @@ snapshots for all publication inputs, with four additional negative regressions.
 **The new (28-case) suite has not yet been executed on WSL2.** Re-run the test
 command above on the latest branch, and separately validate a real C2 Episode
 pair in the installed ImageProgram environment before declaring Gate 1 complete.
+
+
+## WSL2 最終回帰テスト結果（2026-10-09）
+
+Arena PR #14 head `79f8adc3dcfd0f68c0d9326f7cce7eadae444bca` を取得し、
+`python3 -m unittest discover -s tests -p 'test_drawing_review.py' -v` にて
+**28 tests / OK (0.180 s)**。
+全ケースでframe/JSON integrity、post-replay metadata race、
+post-replay frame mutation、private symlink/hardlink、oversized public artifact、
+duplicate-semantic-identity各ケースを検査。
+これはmock fixtureを含むconsumer単体/回帰スイートであり、
+**ImageProgramの実Episode2本を読み込むcross-repo E2Eは別途未実施**。
+Draftを維持する。
