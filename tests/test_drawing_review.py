@@ -143,7 +143,7 @@ class DrawingReviewTests(unittest.TestCase):
             with patch(
                 'adapters.imageprogram_reference.drawing_review.source_replay',
                 side_effect=overwrite_during_source_replay,
-            ), self.assertRaisesRegex(DrawingReviewError, 'changed since validation'):
+            ), self.assertRaisesRegex(DrawingReviewError, r'artifact digest mismatch: final\.png'):
                 create_review_pack([('first', episode, replay)], root / 'pack')
             self.assertFalse((root / 'pack' / 'first-final.png').exists())
 
