@@ -13,7 +13,13 @@ fi
 
 # Do not silently benchmark modified working copies. No automatic git checkout/pull.
 for root in "$arena_root" "$model_root"; do
-  [[ "$(git -C "$root" branch --show-current)" == main ]] || { echo "Not on main: $root" >&2; exit 2; }
+  branch_name="$(git -C "$root" branch --show-current)"
+  if [[ "$root" == "$model_root" && "$branch_name" != main ]]; then
+    echo "ImageProgram must be on main: $root" >&2; exit 2
+  fi
+  if [[ "$root" == "$arena_root" && "$branch_name" != main && "$branch_name" != feat/art1-gate0-c2-a0-verified-run ]]; then
+    echo "Arena must be on main or the Gate 0 review branch: $root" >&2; exit 2
+  fi
   [[ -z "$(git -C "$root" status --porcelain --untracked-files=normal)" ]] || { echo "Working tree is dirty: $root" >&2; exit 2; }
 done
 arena_sha="$(git -C "$arena_root" rev-parse HEAD)"
