@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import io
 import json
 import os
 import re
@@ -17,6 +18,8 @@ from pathlib import Path
 
 FORMAT = 'arena-drawing-review-v0'
 MAX_PUBLIC_FRAME_BYTES = 64 * 1024 * 1024
+MAX_PUBLIC_METADATA_BYTES = 4 * 1024 * 1024
+MAX_PUBLIC_TRANSITIONS_BYTES = 128 * 1024 * 1024
 LABEL = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,47}$')
 PUBLIC_TOP = {'request.json', 'program.json', 'initial_observation.json',
               'transitions.jsonl', 'result.json', 'final.png', 'rejected_action.json'}
@@ -26,18 +29,28 @@ class DrawingReviewError(ValueError):
     """Invalid episode, provenance, or public/private boundary."""
 
 
-def sha256(path: Path) -> str:
-    return 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+def sha256_bytes(data: bytes) -> str:
+    return 'sha256:' + hashlib.sha256(data).hexdigest()
+
+
+def json_object_bytes(data: bytes, filename: str) -> dict:
+    try:
+        value = json.loads(data)
+    except (ValueError, UnicodeError) as exc:
+        raise DrawingReviewError(f'invalid JSON: {filename}') from exc
+    if not isinstance(value, dict):
+        raise DrawingReviewError(f'{filename} must be a JSON object')
+    return value
 
 
 def read_json(path: Path) -> dict:
+    # Standalone parser for caller-owned files; security-critical episode
+    # metadata is always parsed from a verified no-follow snapshot instead.
     try:
-        value = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, ValueError) as exc:
+        data = Path(path).read_bytes()
+    except OSError as exc:
         raise DrawingReviewError(f'invalid JSON: {path.name}') from exc
-    if not isinstance(value, dict):
-        raise DrawingReviewError(f'{path.name} must be a JSON object')
-    return value
+    return json_object_bytes(data, path.name)
 
 
 def safe_public_path(root: Path, name: str) -> Path:
@@ -70,19 +83,34 @@ def safe_public_path(root: Path, name: str) -> Path:
 
 
 
-def verified_frame_snapshot(root: Path, name: str, expected_sha256: str) -> bytes:
-    """Snapshot *verified* public frame bytes before exposing them in the Review Pack.
+def _read_bounded_regular_fd(fd: int, name: str, limit: int) -> bytes:
+    info = os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise DrawingReviewError(f'unsafe public artifact inode: {name}')
+    # Check size before reading; read remains bounded in case the file grows.
+    if info.st_size > limit:
+        raise DrawingReviewError(f'public artifact too large: {name}')
+    with os.fdopen(os.dup(fd), 'rb') as source:
+        data = source.read(limit + 1)
+    if len(data) > limit:
+        raise DrawingReviewError(f'public artifact too large: {name}')
+    return data
 
-    The prior episode check and replay may take a long time. Never copy a
-    pathname re-opened after replay: another process could substitute a
-    symlink to a private artifact, including on the parent frames directory.
-    Open every component relative to an already opened directory fd using
-    O_NOFOLLOW. Verify inode type and hard-link count, then the actual bytes
-    read from that stable fd *before* writing public output.
+
+def _public_snapshot(
+    root: Path, name: str, limit: int, *, manifest: bool = False
+) -> bytes:
+    """Read a bounded immutable byte snapshot with no-follow for every component.
+
+    A pathname check is useful for explicit diagnostics, but has a TOCTOU
+    window. File descriptors opened relative to a pinned directory descriptor,
+    plus digest verification of those bytes, form the actual trust boundary.
     """
-    # Enforce the same public-only filename allowlist as the manifest validator.
-    # This check alone is NOT relied on for race safety.
-    safe_public_path(root, name)
+    if manifest:
+        if name != 'manifest.json':
+            raise DrawingReviewError('unsupported management artifact')
+    else:
+        safe_public_path(root, name)
     relative = Path(name)
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     file_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
@@ -95,28 +123,45 @@ def verified_frame_snapshot(root: Path, name: str, expected_sha256: str) -> byte
             os.close(directory_fd)
             directory_fd = child_fd
         source_fd = os.open(relative.name, file_flags, dir_fd=directory_fd)
-        info = os.fstat(source_fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            raise DrawingReviewError(f'unsafe public frame inode: {name}')
-        if info.st_size > MAX_PUBLIC_FRAME_BYTES:
-            raise DrawingReviewError(f'public frame too large: {name}')
-        with os.fdopen(source_fd, 'rb') as source:
-            source_fd = None  # fd is now owned by the file object
-            data = source.read(MAX_PUBLIC_FRAME_BYTES + 1)
+        return _read_bounded_regular_fd(source_fd, name, limit)
     except OSError as exc:
-        raise DrawingReviewError(f'cannot safely open public frame: {name}') from exc
+        raise DrawingReviewError(f'cannot safely open public artifact: {name}') from exc
     finally:
         if source_fd is not None:
             os.close(source_fd)
         if directory_fd is not None:
             os.close(directory_fd)
 
-    if len(data) > MAX_PUBLIC_FRAME_BYTES:
-        raise DrawingReviewError(f'public frame too large: {name}')
-    actual = 'sha256:' + hashlib.sha256(data).hexdigest()
-    if actual != expected_sha256:
-        raise DrawingReviewError(f'public frame changed since validation: {name}')
+
+def _verified_public_snapshot(
+    root: Path, name: str, expected_sha256: str, limit: int
+) -> bytes:
+    if not isinstance(expected_sha256, str):
+        raise DrawingReviewError(f'artifact digest mismatch: {name}')
+    data = _public_snapshot(root, name, limit)
+    if sha256_bytes(data) != expected_sha256:
+        raise DrawingReviewError(f'artifact digest mismatch: {name}')
     return data
+
+
+def verified_frame_snapshot(root: Path, name: str, expected_sha256: str) -> bytes:
+    """Reopen and validate actual frame bytes after replay, before public export."""
+    return _verified_public_snapshot(root, name, expected_sha256,
+                                     MAX_PUBLIC_FRAME_BYTES)
+
+
+def _external_attestation_snapshot(path: Path) -> bytes:
+    # Attestation location is supplied by the CLI, not by the episode manifest.
+    # Reject symlinks and bounded-read the regular file before publication.
+    fd = None
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        return _read_bounded_regular_fd(fd, path.name, MAX_PUBLIC_METADATA_BYTES)
+    except OSError as exc:
+        raise DrawingReviewError('cannot safely open replay attestation') from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def source_replay(episode: Path) -> dict:
@@ -133,29 +178,30 @@ def source_replay(episode: Path) -> dict:
     return result
 
 
-def canonical_json_hash(path: Path, *, omit_request_id: bool = False) -> str:
-    """Semantic identity without cosmetic formatting or administrative run IDs."""
-    payload = read_json(path)
+def canonical_json_hash(path: Path | bytes, *, omit_request_id: bool = False) -> str:
+    """Semantic identity from verified bytes or standalone test files."""
+    payload = (
+        json_object_bytes(path, 'public artifact')
+        if isinstance(path, bytes) else read_json(path)
+    )
     if omit_request_id:
         payload = {key: value for key, value in payload.items() if key != 'request_id'}
     canonical = json.dumps(
         payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'),
         allow_nan=False,
     ).encode('utf-8')
-    return 'sha256:' + hashlib.sha256(canonical).hexdigest()
+    return sha256_bytes(canonical)
 
 
-
-def canonical_jsonl_hash(path: Path) -> str:
-    """Semantic identity of ordered JSONL records, not their byte formatting.
-
-    Boundaries are preserved with a newline after each canonical JSON object;
-    string newlines are escaped by JSON encoding. The original file digest is
-    retained separately for manifest integrity and artifact provenance.
-    """
+def canonical_jsonl_hash(path: Path | bytes) -> str:
+    """Canonical hash of ordered transitions, preserving record boundaries."""
     digest = hashlib.sha256()
     try:
-        with path.open(encoding='utf-8') as source:
+        if isinstance(path, bytes):
+            source = io.StringIO(path.decode('utf-8'))
+        else:
+            source = Path(path).open(encoding='utf-8')
+        with source:
             for line_number, line in enumerate(source, start=1):
                 try:
                     record = json.loads(line)
@@ -171,7 +217,7 @@ def canonical_jsonl_hash(path: Path) -> str:
                     ) from exc
                 digest.update(canonical)
                 digest.update(b'\n')
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise DrawingReviewError('cannot read transition JSONL') from exc
     return 'sha256:' + digest.hexdigest()
 
