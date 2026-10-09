@@ -41,8 +41,24 @@ Open `runs/a0-first-review/index.html` locally. It displays real **initial / int
 
 ## Tests
 
+This Review Pack consumer is **only on Draft PR #14**, not on `main`.
+Run from the Arena repository root; fetch its feature branch before testing.
+
 ```bash
-python -m unittest -v tests.test_drawing_review
+cd ~/src/ImageProgram-Arena
+git status --short                         # Check local changes before switching
+git fetch origin
+git switch feat/a0-drawing-review-pack-v0 || git switch --track origin/feat/a0-drawing-review-pack-v0
+git pull --ff-only origin feat/a0-drawing-review-pack-v0
+git branch --show-current
+test -f tests/test_drawing_review.py
+
+python3 -m unittest discover -s tests -p 'test_drawing_review.py' -v
 ```
+
+Using `unittest discover` avoids confusion between module-name imports and
+test path discovery. On `main`, `tests/test_drawing_review.py` does **not exist**;
+the resulting `ModuleNotFoundError` is not a failing review-pack test.
+Never interpret existing older tests passing as validating PR #14.
 
 Tests include success from a mock manifest and fail-closed tampering, replay failure, private exposure, symlink and duplicate names. Adversarial tests also mutate an image or its parent directory after replay / just before descriptor open, and ensure nothing from the private tree is exported. Mock fixtures validate the consumer interface only; the **first real Character v0 episode** must still be generated and inspected before #13 is closed.
