@@ -1,0 +1,468 @@
+"""Read-only, hash-checked drawing session review packs for ImageProgram episodes.
+
+Arena does not interpret the painter's program or verify physics itself. Replay must
+be attested by ImageProgram's own runner before the session can be packaged.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import html
+import io
+import json
+import os
+import re
+import stat
+import tempfile
+from pathlib import Path
+
+FORMAT = 'arena-drawing-review-v0'
+MAX_PUBLIC_FRAME_BYTES = 64 * 1024 * 1024
+MAX_PUBLIC_METADATA_BYTES = 4 * 1024 * 1024
+MAX_PUBLIC_TRANSITIONS_BYTES = 128 * 1024 * 1024
+MAX_PRIVATE_REPLAY_BYTES = 256 * 1024 * 1024
+MAX_REPLAY_SNAPSHOT_BYTES = 1024 * 1024 * 1024
+LABEL = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,47}$')
+PUBLIC_TOP = {'request.json', 'program.json', 'initial_observation.json',
+              'transitions.jsonl', 'result.json', 'final.png', 'rejected_action.json'}
+
+
+class DrawingReviewError(ValueError):
+    """Invalid episode, provenance, or public/private boundary."""
+
+
+def sha256_bytes(data: bytes) -> str:
+    return 'sha256:' + hashlib.sha256(data).hexdigest()
+
+
+def json_object_bytes(data: bytes, filename: str) -> dict:
+    try:
+        value = json.loads(data)
+    except (ValueError, UnicodeError) as exc:
+        raise DrawingReviewError(f'invalid JSON: {filename}') from exc
+    if not isinstance(value, dict):
+        raise DrawingReviewError(f'{filename} must be a JSON object')
+    return value
+
+
+def read_json(path: Path) -> dict:
+    # Standalone parser for caller-owned files; security-critical episode
+    # metadata is always parsed from a verified no-follow snapshot instead.
+    try:
+        data = Path(path).read_bytes()
+    except OSError as exc:
+        raise DrawingReviewError(f'invalid JSON: {path.name}') from exc
+    return json_object_bytes(data, path.name)
+
+
+def safe_public_path(root: Path, name: str) -> Path:
+    if not isinstance(name, str) or not name or '\\' in name:
+        raise DrawingReviewError('invalid public artifact path')
+    relative = Path(name)
+    if relative.as_posix() != name:
+        raise DrawingReviewError('non-canonical public artifact path')
+    if (relative.is_absolute() or '..' in relative.parts or '.' in relative.parts
+            or any(part.startswith('.') for part in relative.parts)):
+        raise DrawingReviewError('unsafe public artifact path')
+    if name not in PUBLIC_TOP and not (len(relative.parts) == 2
+                                        and relative.parts[0] == 'frames'
+                                        and re.fullmatch(r'\d{6}\.png', relative.name)):
+        raise DrawingReviewError('non-public or unrecognized artifact path')
+    # An in-tree 'frames' symlink to 'private/frames' resolves inside root.
+    # Check *every* prefix, not only the leaf or final resolved location.
+    path = root
+    for part in relative.parts:
+        path = path / part
+        if path.is_symlink():
+            raise DrawingReviewError(f'symlinked public artifact component: {name}')
+    if not path.resolve().is_relative_to(root.resolve()) or not path.is_file():
+        raise DrawingReviewError(f'missing or escaping artifact: {name}')
+    # A hard link to any hidden file has the same inode and cannot be detected
+    # by is_symlink(). Fail closed on multiply linked public inputs.
+    if path.stat().st_nlink != 1:
+        raise DrawingReviewError(f'hard-linked public artifact: {name}')
+    return path
+
+
+
+def _read_bounded_regular_fd(fd: int, name: str, limit: int) -> bytes:
+    info = os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise DrawingReviewError(f'unsafe public artifact inode: {name}')
+    # Check size before reading; read remains bounded in case the file grows.
+    if info.st_size > limit:
+        raise DrawingReviewError(f'public artifact too large: {name}')
+    with os.fdopen(os.dup(fd), 'rb') as source:
+        data = source.read(limit + 1)
+    if len(data) > limit:
+        raise DrawingReviewError(f'public artifact too large: {name}')
+    return data
+
+
+def _public_snapshot(
+    root: Path, name: str, limit: int, *, manifest: bool = False,
+    private: bool = False
+) -> bytes:
+    """Read a bounded immutable byte snapshot with no-follow for every component.
+
+    A pathname check is useful for explicit diagnostics, but has a TOCTOU
+    window. File descriptors opened relative to a pinned directory descriptor,
+    plus digest verification of those bytes, form the actual trust boundary.
+    """
+    if manifest:
+        if name != 'manifest.json':
+            raise DrawingReviewError('unsupported management artifact')
+    elif private:
+        # Management checkpoints are never copied to the public Review Pack.
+        # The private snapshot is used only by an isolated source replay.
+        relative = Path(name) if isinstance(name, str) else Path()
+        if (not isinstance(name, str) or relative.as_posix() != name
+                or len(relative.parts) < 2 or relative.parts[0] != 'private'
+                or '\\' in name or any(part in {'.', '..'} or part.startswith('.')
+                                     for part in relative.parts)):
+            raise DrawingReviewError('invalid private replay artifact path')
+    else:
+        safe_public_path(root, name)
+    relative = Path(name)
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    directory_fd = None
+    source_fd = None
+    try:
+        directory_fd = os.open(root, directory_flags)
+        for component in relative.parts[:-1]:
+            child_fd = os.open(component, directory_flags, dir_fd=directory_fd)
+            os.close(directory_fd)
+            directory_fd = child_fd
+        source_fd = os.open(relative.name, file_flags, dir_fd=directory_fd)
+        return _read_bounded_regular_fd(source_fd, name, limit)
+    except OSError as exc:
+        raise DrawingReviewError(f'cannot safely open public artifact: {name}') from exc
+    finally:
+        if source_fd is not None:
+            os.close(source_fd)
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+
+def _verified_public_snapshot(
+    root: Path, name: str, expected_sha256: str, limit: int
+) -> bytes:
+    if not isinstance(expected_sha256, str):
+        raise DrawingReviewError(f'artifact digest mismatch: {name}')
+    data = _public_snapshot(root, name, limit)
+    if sha256_bytes(data) != expected_sha256:
+        raise DrawingReviewError(f'artifact digest mismatch: {name}')
+    return data
+
+
+def verified_frame_snapshot(root: Path, name: str, expected_sha256: str) -> bytes:
+    """Reopen and validate actual frame bytes after replay, before public export."""
+    return _verified_public_snapshot(root, name, expected_sha256,
+                                     MAX_PUBLIC_FRAME_BYTES)
+
+
+def _external_attestation_snapshot(path: Path) -> bytes:
+    # Attestation location is supplied by the CLI, not by the episode manifest.
+    # Reject symlinks and bounded-read the regular file before publication.
+    fd = None
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        return _read_bounded_regular_fd(fd, path.name, MAX_PUBLIC_METADATA_BYTES)
+    except OSError as exc:
+        raise DrawingReviewError('cannot safely open replay attestation') from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def source_replay(episode: Path) -> dict:
+    """Re-run exactly this episode with the version-pinned ImageProgram engine."""
+    try:
+        from imageprogram.experiments.runner import replay
+    except ImportError as exc:
+        raise DrawingReviewError(
+            'ImageProgram must be installed to verify source replay'
+        ) from exc
+    result = replay(episode)
+    if not isinstance(result, dict):
+        raise DrawingReviewError('source replay returned an invalid report')
+    return result
+
+
+def _snapshot_and_source_replay(
+    episode: Path, manifest_bytes: bytes, files: dict[str, str]
+) -> dict:
+    """Replay an immutable, digest-verified private copy of exactly this episode.
+
+    Replaying a source pathname after metadata validation is unsafe: a renamed
+    episode root can point replay at another valid episode with identical
+    terminal summary fields. Never use the unpinned source directory for replay.
+    The scratch copy (including private checkpoints) is deleted before return
+    and is never part of the public Review Pack.
+    """
+    total_bytes = len(manifest_bytes)
+    with tempfile.TemporaryDirectory(prefix='arena-source-replay-') as temp:
+        replay_root = Path(temp)
+        for name, digest in files.items():
+            is_private = isinstance(name, str) and name.startswith('private/')
+            if is_private:
+                limit = MAX_PRIVATE_REPLAY_BYTES
+            elif isinstance(name, str) and name.endswith('.png'):
+                limit = MAX_PUBLIC_FRAME_BYTES
+            elif name == 'transitions.jsonl':
+                limit = MAX_PUBLIC_TRANSITIONS_BYTES
+            else:
+                limit = MAX_PUBLIC_METADATA_BYTES
+            if not isinstance(name, str):
+                raise DrawingReviewError('invalid source episode artifact path')
+            data = _public_snapshot(episode, name, limit, private=is_private)
+            if not isinstance(digest, str) or sha256_bytes(data) != digest:
+                raise DrawingReviewError(f'artifact digest mismatch: {name}')
+            total_bytes += len(data)
+            if total_bytes > MAX_REPLAY_SNAPSHOT_BYTES:
+                raise DrawingReviewError('episode too large for pinned source replay')
+            destination = replay_root.joinpath(*Path(name).parts)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(data)
+        (replay_root / 'manifest.json').write_bytes(manifest_bytes)
+        return source_replay(replay_root)
+
+
+def canonical_json_hash(path: Path | bytes, *, omit_request_id: bool = False) -> str:
+    """Semantic identity from verified bytes or standalone test files."""
+    payload = (
+        json_object_bytes(path, 'public artifact')
+        if isinstance(path, bytes) else read_json(path)
+    )
+    if omit_request_id:
+        payload = {key: value for key, value in payload.items() if key != 'request_id'}
+    canonical = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'),
+        allow_nan=False,
+    ).encode('utf-8')
+    return sha256_bytes(canonical)
+
+
+def canonical_jsonl_hash(path: Path | bytes) -> str:
+    """Canonical hash of ordered transitions, preserving record boundaries."""
+    digest = hashlib.sha256()
+    try:
+        if isinstance(path, bytes):
+            source = io.StringIO(path.decode('utf-8'))
+        else:
+            source = Path(path).open(encoding='utf-8')
+        with source:
+            for line_number, line in enumerate(source, start=1):
+                try:
+                    record = json.loads(line)
+                    if not isinstance(record, dict):
+                        raise ValueError('expected JSON object')
+                    canonical = json.dumps(
+                        record, ensure_ascii=False, sort_keys=True,
+                        separators=(',', ':'), allow_nan=False,
+                    ).encode('utf-8')
+                except (ValueError, UnicodeError) as exc:
+                    raise DrawingReviewError(
+                        f'invalid transition JSONL record at line {line_number}'
+                    ) from exc
+                digest.update(canonical)
+                digest.update(b'\n')
+    except (OSError, UnicodeError) as exc:
+        raise DrawingReviewError('cannot read transition JSONL') from exc
+    return 'sha256:' + digest.hexdigest()
+
+
+def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
+    if not LABEL.fullmatch(label):
+        raise DrawingReviewError('label must be a short ASCII slug')
+    episode = Path(episode)
+    if episode.is_symlink():
+        raise DrawingReviewError('episode root must not be a symlink')
+    episode = episode.resolve()
+    # The manifest itself is not public and is deliberately not in PUBLIC_TOP.
+    # It is still read through a bounded, no-follow descriptor snapshot.
+    manifest_bytes = _public_snapshot(
+        episode, 'manifest.json', MAX_PUBLIC_METADATA_BYTES, manifest=True
+    )
+    manifest = json_object_bytes(manifest_bytes, 'manifest.json')
+    if manifest.get('format') != 'imageprogram-episode-1':
+        raise DrawingReviewError('unsupported ImageProgram episode format')
+    files = manifest.get('files')
+    public = manifest.get('sites_files')
+    if not isinstance(files, dict) or not isinstance(public, list):
+        raise DrawingReviewError('invalid manifest files/sites_files')
+    expected_public = [name for name in files if not name.startswith('private/')]
+    if public != expected_public or len(set(public)) != len(public):
+        raise DrawingReviewError('public/private artifact manifest boundary invalid')
+    required = {'request.json', 'program.json', 'result.json', 'initial_observation.json',
+                'transitions.jsonl', 'frames/000000.png', 'final.png'}
+    if not required.issubset(public):
+        raise DrawingReviewError('incomplete public episode')
+    # The bytes used for published metadata and semantic dedup MUST be the
+    # very same bytes whose hashes matched the source manifest. Merely
+    # validating paths earlier cannot prevent a post-check symlink swap.
+    snapshots: dict[str, bytes] = {}
+    for name in public:
+        if not isinstance(name, str):
+            raise DrawingReviewError('invalid public artifact path')
+        limit = (
+            MAX_PUBLIC_FRAME_BYTES if name.endswith('.png')
+            else MAX_PUBLIC_TRANSITIONS_BYTES if name == 'transitions.jsonl'
+            else MAX_PUBLIC_METADATA_BYTES
+        )
+        data = _verified_public_snapshot(episode, name, files[name], limit)
+        if name in {'request.json', 'result.json', 'program.json',
+                    'transitions.jsonl'}:
+            snapshots[name] = data
+    if manifest.get('result_sha256') != files['result.json']:
+        raise DrawingReviewError('result digest mismatch')
+
+    result = json_object_bytes(snapshots['result.json'], 'result.json')
+    request = json_object_bytes(snapshots['request.json'], 'request.json')
+    n = result.get('accepted_actions')
+    if type(n) is not int or n < 2 or n > 1_000_000:
+        raise DrawingReviewError('requires a completed multi-action episode')
+    middle = n // 2
+    terminal_frame = f'frames/{n:06d}.png'
+    frame_names = ['frames/000000.png', f'frames/{middle:06d}.png', 'final.png']
+    if any(name not in public for name in (*frame_names, terminal_frame)):
+        raise DrawingReviewError('initial/mid/terminal/final frames missing from manifest')
+    if files['final.png'] != files[terminal_frame]:
+        raise DrawingReviewError('final.png does not match terminal numbered frame')
+    if result.get('status') not in {'program_exhausted', 'budget_exhausted', 'failed'}:
+        raise DrawingReviewError('missing or invalid terminal execution status')
+    if result.get('request_id') != request.get('request_id'):
+        raise DrawingReviewError('request/result ID mismatch')
+    if not isinstance(result.get('versions'), dict) or not result['versions']:
+        raise DrawingReviewError('runtime versions missing')
+    if not isinstance(result.get('initial_state_hash'), str) or not result['initial_state_hash']:
+        raise DrawingReviewError('initial state identity missing')
+    if not isinstance(result.get('final_state_hash'), str) or not result['final_state_hash']:
+        raise DrawingReviewError('final state identity missing')
+    replay_bytes = _external_attestation_snapshot(Path(replay_report))
+    replay = json_object_bytes(replay_bytes, 'replay attestation')
+    if replay.get('verified') is not True:
+        raise DrawingReviewError('ImageProgram replay is not verified')
+    if (replay.get('transitions') != n
+            or replay.get('final_state_hash') != result.get('final_state_hash')
+            or replay.get('status') != result.get('status')
+            or replay.get('goal_evaluated') is not False):
+        raise DrawingReviewError('replay attestation does not match this episode')
+    # Replay only a private, immutable digest-verified snapshot, so a
+    # directory rename after validation cannot change the attested episode.
+    fresh = _snapshot_and_source_replay(episode, manifest_bytes, files)
+    if (fresh.get('verified') is not True
+            or fresh.get('transitions') != n
+            or fresh.get('final_state_hash') != result['final_state_hash']
+            or fresh.get('status') != result['status']
+            or fresh.get('goal_evaluated') is not False):
+        raise DrawingReviewError('fresh source replay disagrees with this episode')
+    # A replay report is only an attestation from ImageProgram. Do not claim
+    # that an independent Arena physics replay has taken place.
+    return {
+        'label': label, 'episode': episode, 'replay_report': Path(replay_report).resolve(),
+        'frame_names': frame_names,
+        'frame_hashes': [files[name] for name in frame_names],
+        'record': {
+            'label': label, 'source_format': manifest['format'],
+            'request_id': result['request_id'], 'seed': request.get('seed'),
+            'body': request.get('body'), 'goal': request.get('goal'),
+            'initial_state_hash': result['initial_state_hash'],
+            'final_state_hash': result['final_state_hash'],
+            'source_request_sha256': files['request.json'],
+            'source_program_sha256': files['program.json'],
+            'source_request_semantic_hash': canonical_json_hash(
+                snapshots['request.json'], omit_request_id=True
+            ),
+            'source_program_semantic_hash': canonical_json_hash(snapshots['program.json']),
+            'source_transition_sha256': files['transitions.jsonl'],
+            'source_transition_semantic_hash': canonical_jsonl_hash(
+                snapshots['transitions.jsonl']
+            ),
+            'source_initial_frame_sha256': files['frames/000000.png'],
+            'fresh_source_replay_verified': True,
+            'status': result.get('status'), 'stop_reason': result.get('stop_reason'),
+            'accepted_actions': n, 'costs': result.get('costs'),
+            'versions': result['versions'], 'replay_attested_by_source': True,
+            'provenance': 'scripted_or_other_source_must_be_verified_separately',
+            'episode_manifest_sha256': sha256_bytes(manifest_bytes),
+            'replay_attestation_sha256': sha256_bytes(replay_bytes),
+        },
+    }
+
+
+def create_review_pack(sessions: list[tuple[str, Path, Path]], out: Path) -> dict:
+    if not sessions or len(sessions) > 16:
+        raise DrawingReviewError('provide 1..16 sessions')
+    labels = [item[0] for item in sessions]
+    if len(labels) != len(set(labels)):
+        raise DrawingReviewError('session labels must be unique')
+    validated = [validate_session(*session) for session in sessions]
+    if len({item['episode'] for item in validated}) != len(validated):
+        raise DrawingReviewError('duplicate episode path across session labels')
+    # Identical deterministic source runs are not independent comparisons, even
+    # when copied to different folders or re-run with new wall-time metadata.
+    identities = [
+        (item['record']['source_request_semantic_hash'],
+         item['record']['source_program_semantic_hash'],
+         item['record']['initial_state_hash'],
+         item['record']['final_state_hash'],
+         item['record']['source_transition_semantic_hash'],
+         item['record']['source_initial_frame_sha256'])
+        for item in validated
+    ]
+    if len(set(identities)) != len(identities):
+        raise DrawingReviewError('duplicate episode identity across sessions')
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=False)
+    records = []
+    for session in validated:
+        label = session['label']
+        images = {}
+        for key, filename, expected in zip(
+            ('initial', 'intermediate', 'final'),
+            session['frame_names'], session['frame_hashes'], strict=True
+        ):
+            # Reopen safely by file descriptors, then validate the bytes actually
+            # read against the original manifest *before* any public write.
+            snapshot = verified_frame_snapshot(session['episode'], filename, expected)
+            target = out / f'{label}-{key}.png'
+            with target.open('xb') as destination:
+                destination.write(snapshot)
+            images[key] = {
+                'file': target.name,
+                'sha256': expected,
+                'source_sha256': expected,
+            }
+        records.append({**session['record'], 'images': images})
+    pack = {'format': FORMAT, 'sessions': records,
+            'claims': {'visualized_real_source_episode': True,
+                       'independent_arena_replay': False,
+                       'learned_policy_or_skill': False}}
+    (out / 'review.json').write_text(json.dumps(pack, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+    cards = []
+    for rec in records:
+        pictures = ''.join(f'<figure><img alt="{key}" src="{rec["images"][key]["file"]}"><figcaption>{key}</figcaption></figure>' for key in ('initial','intermediate','final'))
+        cards.append(f'<section><h2>{html.escape(rec["label"])}</h2><p>status: {html.escape(str(rec["status"]))} · actions: {rec["accepted_actions"]} · source replay attested</p><div class="frames">{pictures}</div></section>')
+    page = ('<!doctype html><html lang="ja"><meta charset="utf-8"><title>Drawing Sessions</title>'
+            '<style>body{font:16px system-ui;margin:2rem;max-width:1100px}section{margin:2rem 0}.frames{display:flex;gap:1rem;flex-wrap:wrap}figure{margin:0;max-width:30%}img{width:100%;image-rendering:auto;border:1px solid #aaa}figcaption{text-align:center}small{color:#666}</style>'
+            '<h1>Drawing Session Review Pack</h1><small>Recorded episode frames; not evidence of autonomous learning.</small>'
+            + ''.join(cards) + '</html>')
+    (out / 'index.html').write_text(page, encoding='utf-8')
+    return pack
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description='Review actual ImageProgram drawing episodes')
+    parser.add_argument('--session', nargs=3, metavar=('LABEL', 'EPISODE', 'REPLAY_JSON'), action='append', required=True)
+    parser.add_argument('--out', type=Path, required=True)
+    args = parser.parse_args()
+    pack = create_review_pack([(label, Path(ep), Path(rep)) for label, ep, rep in args.session], args.out)
+    print(json.dumps({'format': FORMAT, 'sessions': len(pack['sessions']), 'review': str(args.out / 'index.html')}, ensure_ascii=False))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
