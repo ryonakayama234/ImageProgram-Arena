@@ -229,9 +229,12 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
     if episode.is_symlink():
         raise DrawingReviewError('episode root must not be a symlink')
     episode = episode.resolve()
-    if (episode / 'manifest.json').is_symlink():
-        raise DrawingReviewError('manifest must not be a symlink')
-    manifest = read_json(episode / 'manifest.json')
+    # The manifest itself is not public and is deliberately not in PUBLIC_TOP.
+    # It is still read through a bounded, no-follow descriptor snapshot.
+    manifest_bytes = _public_snapshot(
+        episode, 'manifest.json', MAX_PUBLIC_METADATA_BYTES, manifest=True
+    )
+    manifest = json_object_bytes(manifest_bytes, 'manifest.json')
     if manifest.get('format') != 'imageprogram-episode-1':
         raise DrawingReviewError('unsupported ImageProgram episode format')
     files = manifest.get('files')
@@ -245,15 +248,27 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
                 'transitions.jsonl', 'frames/000000.png', 'final.png'}
     if not required.issubset(public):
         raise DrawingReviewError('incomplete public episode')
+    # The bytes used for published metadata and semantic dedup MUST be the
+    # very same bytes whose hashes matched the source manifest. Merely
+    # validating paths earlier cannot prevent a post-check symlink swap.
+    snapshots: dict[str, bytes] = {}
     for name in public:
-        path = safe_public_path(episode, name)
-        if not isinstance(files[name], str) or sha256(path) != files[name]:
-            raise DrawingReviewError(f'artifact digest mismatch: {name}')
+        if not isinstance(name, str):
+            raise DrawingReviewError('invalid public artifact path')
+        limit = (
+            MAX_PUBLIC_FRAME_BYTES if name.endswith('.png')
+            else MAX_PUBLIC_TRANSITIONS_BYTES if name == 'transitions.jsonl'
+            else MAX_PUBLIC_METADATA_BYTES
+        )
+        data = _verified_public_snapshot(episode, name, files[name], limit)
+        if name in {'request.json', 'result.json', 'program.json',
+                    'transitions.jsonl'}:
+            snapshots[name] = data
     if manifest.get('result_sha256') != files['result.json']:
         raise DrawingReviewError('result digest mismatch')
 
-    result = read_json(episode / 'result.json')
-    request = read_json(episode / 'request.json')
+    result = json_object_bytes(snapshots['result.json'], 'result.json')
+    request = json_object_bytes(snapshots['request.json'], 'request.json')
     n = result.get('accepted_actions')
     if type(n) is not int or n < 2 or n > 1_000_000:
         raise DrawingReviewError('requires a completed multi-action episode')
@@ -274,9 +289,8 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
         raise DrawingReviewError('initial state identity missing')
     if not isinstance(result.get('final_state_hash'), str) or not result['final_state_hash']:
         raise DrawingReviewError('final state identity missing')
-    if Path(replay_report).is_symlink():
-        raise DrawingReviewError('replay attestation must not be a symlink')
-    replay = read_json(Path(replay_report))
+    replay_bytes = _external_attestation_snapshot(Path(replay_report))
+    replay = json_object_bytes(replay_bytes, 'replay attestation')
     if replay.get('verified') is not True:
         raise DrawingReviewError('ImageProgram replay is not verified')
     if (replay.get('transitions') != n
@@ -309,12 +323,12 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
             'source_request_sha256': files['request.json'],
             'source_program_sha256': files['program.json'],
             'source_request_semantic_hash': canonical_json_hash(
-                episode / 'request.json', omit_request_id=True
+                snapshots['request.json'], omit_request_id=True
             ),
-            'source_program_semantic_hash': canonical_json_hash(episode / 'program.json'),
+            'source_program_semantic_hash': canonical_json_hash(snapshots['program.json']),
             'source_transition_sha256': files['transitions.jsonl'],
             'source_transition_semantic_hash': canonical_jsonl_hash(
-                episode / 'transitions.jsonl'
+                snapshots['transitions.jsonl']
             ),
             'source_initial_frame_sha256': files['frames/000000.png'],
             'fresh_source_replay_verified': True,
@@ -322,8 +336,8 @@ def validate_session(label: str, episode: Path, replay_report: Path) -> dict:
             'accepted_actions': n, 'costs': result.get('costs'),
             'versions': result['versions'], 'replay_attested_by_source': True,
             'provenance': 'scripted_or_other_source_must_be_verified_separately',
-            'episode_manifest_sha256': sha256(episode / 'manifest.json'),
-            'replay_attestation_sha256': sha256(Path(replay_report)),
+            'episode_manifest_sha256': sha256_bytes(manifest_bytes),
+            'replay_attestation_sha256': sha256_bytes(replay_bytes),
         },
     }
 
