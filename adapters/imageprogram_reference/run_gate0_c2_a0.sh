@@ -26,6 +26,7 @@ arena_sha="$(git -C "$arena_root" rev-parse HEAD)"
 model_sha="$(git -C "$model_root" rev-parse HEAD)"
 mkdir -p "$arena_root/runs"
 work="$(mktemp -d "$arena_root/runs/art1-gate0-XXXXXXXX")"
+exec > >(tee -a "$work/run.log") 2>&1
 printf 'Gate 0 directory: %s\nImageProgram: %s\nArena: %s\n' "$work" "$model_sha" "$arena_sha"
 
 # Run source tests and Arena regression before any research claim.
@@ -33,7 +34,7 @@ cd "$model_root"
 uv sync --locked --extra render
 uv run python scripts/check.py
 uv run ruff check .
-(cd "$arena_root" && python3 -m unittest discover -s tests -p 'test_*.py' -v)
+(cd "$arena_root" && "$model_root/.venv/bin/python" -m unittest discover -s tests -p 'test_*.py' -v)
 
 uv run python scripts/girl_hair_completion.py --out "$work/c2"
 uv run python "$arena_root/adapters/imageprogram_reference/drawing_review.py" \
