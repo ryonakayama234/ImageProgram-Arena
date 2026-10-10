@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -52,6 +53,24 @@ class PublicReferenceROITests(unittest.TestCase):
         Image.new("RGB", (128, 128), "black").save(self.source)
         with self.assertRaisesRegex(ValueError, "no longer matches"):
             export_permitted_roi(self.source, self.manifest, self.root / "public")
+        self.assertFalse((self.root / "public").exists())
+
+    def test_source_replaced_after_intake_recheck_is_not_exported(self):
+        # Simulate a local writer changing source between the management
+        # verification and the final crop read. Never export unverified pixels.
+        real_ingest = ingest_local_source
+
+        def verify_then_replace(*args, **kwargs):
+            result = real_ingest(*args, **kwargs)
+            Image.new("RGB", (128, 128), "black").save(self.source)
+            return result
+
+        with patch(
+            "adapters.imageprogram_reference.public_reference_roi.ingest_local_source",
+            side_effect=verify_then_replace,
+        ):
+            with self.assertRaisesRegex(ValueError, "source changed after"):
+                export_permitted_roi(self.source, self.manifest, self.root / "public")
         self.assertFalse((self.root / "public").exists())
 
     def test_tampered_annotation_is_not_exported(self):
