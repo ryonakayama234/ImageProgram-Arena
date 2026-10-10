@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 from pathlib import Path
 
 from PIL import Image, ImageOps
 
-from adapters.imageprogram_reference.source_artwork import ingest_local_source
+from adapters.imageprogram_reference.source_artwork import MAX_SOURCE_BYTES, ingest_local_source
 
 
 def export_permitted_roi(source: Path, management_manifest: Path, output: Path) -> dict:
@@ -35,9 +36,18 @@ def export_permitted_roi(source: Path, management_manifest: Path, output: Path) 
     )
     if checked != management:
         raise ValueError("management manifest no longer matches original source/ROI")
-    # Same normalization as source_artwork.ingest_local_source; verify bytes and
-    # pixel-stream hash again above before exporting any policy-visible pixels.
-    with Image.open(source) as original:
+    # The checked path can be replaced after ingest_local_source() returns.
+    # Re-read bounded source bytes, recheck the management digest, then decode
+    # exclusively from this immutable byte snapshot (never reopen the pathname).
+    if source.is_symlink() or not source.is_file():
+        raise ValueError("source must remain a regular non-symlink file")
+    with source.open("rb") as handle:
+        snapshot = handle.read(MAX_SOURCE_BYTES + 1)
+    if (not snapshot or len(snapshot) > MAX_SOURCE_BYTES or
+            "sha256:" + hashlib.sha256(snapshot).hexdigest()
+            != info["source_bytes_sha256"]):
+        raise ValueError("source changed after management verification")
+    with Image.open(io.BytesIO(snapshot)) as original:
         normalized = ImageOps.exif_transpose(original)
         if normalized.mode in ("RGBA", "LA"):
             rgba = normalized.convert("RGBA")
