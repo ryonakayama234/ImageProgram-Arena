@@ -63,6 +63,6 @@ python3 -m unittest discover -s tests -p 'test_gate0_audit.py' -v
 bash -n adapters/imageprogram_reference/run_gate0_c2_a0.sh
 ~~~
 
-The eight audit tests use **mock-only fixtures**, covering identical outcomes, changed task, fake fresh replay, zero ink, protected-zone violations, same Program and inconsistent continuation costs. Unit tests are not real-episode evidence.
+The eleven audit tests use **mock-only fixtures**, covering identical outcomes, changed task, fake fresh replay, zero ink, protected-zone violations, same Program, inconsistent continuation costs, tampered PNG bytes, mismatched frame SHA-256, and unsafe paths. Unit tests are not real-episode evidence. These checks cannot substitute for a real ImageProgram replay and a human visual review.
 
 After Gate 0, the next milestone is Gate 1: real local reference-image ingestion, digest, ROI, visibility boundaries and coordinate contract; no need to add a new drawing primitive or learned model at this stage.
