@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -82,9 +83,25 @@ def audit(c2: Path, review: Path, model_sha: str, arena_sha: str) -> dict:
                 f"{label}: missing re-observation")
         pictures = session.get("images")
         require(isinstance(pictures, dict) and
-                set(pictures) == {"initial", "intermediate", "final"} and
-                all((review / item.get("file", "")).is_file() for item in pictures.values()),
+                set(pictures) == {"initial", "intermediate", "final"},
                 f"{label}: review frames missing")
+        # The Arena consumer verified source frames while constructing the Pack.
+        # Independently check the *current* Review Pack bytes against that
+        # evidence; file-existence alone also accepts fake/truncated images.
+        for kind, item in pictures.items():
+            require(isinstance(item, dict) and
+                    item.get("file") == f"{label}-{kind}.png",
+                    f"{label}: invalid review frame path")
+            path = review / item["file"]
+            require(path.is_file() and not path.is_symlink(),
+                    f"{label}: review frames missing or symlinked")
+            data = path.read_bytes()
+            digest = "sha256:" + hashlib.sha256(data).hexdigest()
+            require(len(data) >= 24 and data[:8] == b"\x5cx89PNG\x5cr\x5cn\x5cx1a\x5cn" and
+                    data[12:16] == b"IHDR",
+                    f"{label}: invalid PNG review frame")
+            require(item.get("sha256") == item.get("source_sha256") == digest,
+                    f"{label}: review frame digest mismatch")
         source_initials.append(session.get("initial_state_hash"))
         source_finals.append(session.get("final_state_hash"))
         request_semantics.append(session.get("source_request_semantic_hash"))
