@@ -10,8 +10,9 @@ Choose a self-controlled PNG/JPEG high-contrast black open curve on a light back
 
 - ImageProgram branch: feat/art1-first-contact-motor-v0 (new implementation)
 - Arena branch: feat/art1-first-contact-e2e-v0, stacked on feat/art1-local-source-roi-ingest-v0 (Arena PR #19)
-- Have clean sibling checkouts ~/src/ImageProgram and ~/src/ImageProgram-Arena
+- Have clean sibling checkouts ~/src/ImageProgram and ~/src/ImageProgram-Arena. The draft runner **checks exact branch names** and records both commit SHAs. It never fetches, checks out, or resets the repositories.
 - Install ImageProgram environment: cd ~/src/ImageProgram && uv sync --locked --extra render
+- The runner executes **full ImageProgram checks and Ruff**, then **all Arena unittest tests** before processing artwork. These updated heads are not yet WSL2-tested.
 
 From Arena checkout:
 
@@ -22,10 +23,10 @@ Example only: replace file/coordinates with **your own** normalized post-EXIF so
 
 ## What runs
 
-1. Arena SourceArtwork management intake validates bytes, EXIF normalization, source metadata, rights label, ROI integrity.
+1. Arena SourceArtwork management intake validates bytes, EXIF normalization, source metadata, rights label, ROI integrity. The ROI exporter rechecks a bounded immutable byte snapshot against the recorded SHA-256, then decodes and crops **that same snapshot**, not a re-opened unchecked pathname.
 2. Arena checks the same source again and exports exactly a **permitted L8 ROI** and a minimal policy task; private source file path, family, rights and hidden target are not forwarded. This is explicitly a reference-visible task (restore_reference), NOT blind completion.
 3. ImageProgram's deterministic threshold + thinning extracts a supported open-line skeleton. RDP fine and coarse curves become actual existing P2 TracePolylineCalls, lowered to P1 World Motor.
-4. Preflight checks real swept-ink protection for the complementary area outside the editable ROI. Three independent real World episodes start from the same blank state: fine, coarse, noop.
+4. Preflight checks real swept-ink protection for the complementary area outside the editable ROI. Three independent real World episodes start from the same blank state: fine, coarse, noop. The noop uses **two legal wait actions** (zero ink) because the A0 Review Pack requires at least two accepted actions to show an intermediate frame.
 5. Real P1 source replay and Arena's independent geometric tolerance-2px F1 plus actual ink-outside-ROI/command counts. Arena Review Pack freshly calls source replay on all three episodes. Human review remains necessary.
 
 ## Artifacts
@@ -38,6 +39,6 @@ This pilot ONLY probes isolated permitted artwork → deterministic Program prop
 
 ## Next gate
 
-Record first successful WSL2 local run and inspect the actual two line drawings. If source succeeds, ART-2 can begin finding reusable cross-task parameters and evaluate on source-family-disjoint held-outs.
+Record first successful WSL2 local run and inspect the actual two line drawings. Log both exact head SHAs, regression test totals, actual replay status, fine/coarse/noop scores, Motor costs, ink outside E, human visual verdict, and unsupported/failure reasons. Keep raw sources, crops and private episodes in ignored runs/ only. **Fresh WSL2 First Contact E2E and human image review are still pending** on these draft heads. If source succeeds, ART-2 can begin finding reusable cross-task parameters and evaluate on source-family-disjoint held-outs.
 
 Related: ImageProgram #63, Arena #16, ImageProgram #64.
