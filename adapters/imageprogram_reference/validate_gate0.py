@@ -97,7 +97,7 @@ def audit(c2: Path, review: Path, model_sha: str, arena_sha: str) -> dict:
                     f"{label}: review frames missing or symlinked")
             data = path.read_bytes()
             digest = "sha256:" + hashlib.sha256(data).hexdigest()
-            require(len(data) >= 24 and data[:8] == b"\x5cx89PNG\x5cr\x5cn\x5cx1a\x5cn" and
+            require(len(data) >= 24 and data[:8] == b"\x89PNG\r\n\x1a\n" and
                     data[12:16] == b"IHDR",
                     f"{label}: invalid PNG review frame")
             require(item.get("sha256") == item.get("source_sha256") == digest,
