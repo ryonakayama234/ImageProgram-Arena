@@ -5,7 +5,7 @@ if [[ $# -ne 7 ]]; then
   echo "Usage: $0 /absolute/path/to/source.png X0 Y0 X1 Y1 SOURCE_FAMILY RIGHTS" >&2
   exit 2
 fi
-source_image="$(realpath "$1")"
+source_image="$(realpath -s -- "$1")"
 shift
 x0="$1"; y0="$2"; x1="$3"; y1="$4"; source_family="$5"; rights="$6"
 arena_root="$(cd "$(dirname "$0")/../.." && pwd -P)"
