@@ -2,9 +2,23 @@
 
 **Status: experimental code on stacked Draft PRs. This is not evidence of learned Skill or of real-art task completion.** Raw artworks, local ROI crops, source-family provenance and private checkpoints stay only in local ignored runs/.
 
-## Target
+## Target — real character-first; synthetic only for debugging
 
-Choose a self-controlled PNG/JPEG high-contrast black open curve on a light background, for example **one isolated hair strand**. For this first pilot the curve must be inside the ROI with margin, not intersect another line, not be a loop, and not be a large filled region. ROI width/height must be 12..256 px, max 65,536 px total. Dense, textured, colored, branched and cycle paths will fail explicitly; do not quietly claim support.
+The **first user-facing artwork experiment must use an authorized real character illustration**, not a succession of arbitrary synthetic marks. Select an artistically meaningful ROI (e.g. a bang/forelock silhouette, hair tip near face, eyelid/face contour) and retain a local-only overview/context thumbnail with the selected ROI; human selection of a coarse ROI is permitted, but supplying the exact contour or author stroke order as hidden ground truth to the Painter is not.
+
+The **current v0 algorithm remains limited** to an isolated high-contrast dark open curve within a cropped ROI, with margins, no intersections, loops or large fill. ROI width/height is 12..256 px (max 65,536 px total). For a real character crop with intersections, shading, or dense hair, record a structured **unsupported/perception/representation failure on that meaningful source** rather than switching the artistic goal to endless arbitrary synthetic squiggles or claiming success. The separate synthetic smoke is only an engineering diagnostic, not an artwork milestone.
+
+## Eye-first next implementation slice (NOT YET IMPLEMENTED)
+
+This Draft currently executes **one-shot** reference ROI -> geometry -> fixed Motor candidates -> terminal Arena scoring. It **does not** yet route real art through ImageProgram's P2 `ObservationBroker`, query-conditioned `Percept` / `QueryEngine`, `BeliefState`, or post-stroke feedback. Thus it must not claim genuine closed-loop Eye or learned vision.
+
+The next ImageProgram-owned implementation must keep the actual visual task and expose one observation-driven correction loop:
+1. Acquire an allowed **reference observation** for `restore_reference`; record source/observation identity, spatial ROI, Eye query(s), measured/unknown Percepts and provenance, without giving evaluator-private witness, raw full artwork or known author action history to the Painter.
+2. Acquire the **real World canvas observation** through the existing `ObservationBroker` / `QueryEngine` and generate a bounded legal Motor proposal. Keep target-versus-current comparison and any construction hypotheses explicitly typed as inferred, not historical stroke truth.
+3. Execute initial legal Motor actions via P1, then **reacquire a fresh World frame**, remeasure relevant percepts and construct a new Belief. Replan **at most one** additional safe ink-only correction from the new observation; fail explicitly if the only correction would require erase/color/unsupported media.
+4. Compare a **frozen one-shot** baseline with feedback enabled/disabled on the *same source ROI and budgets*, logging quality delta, additional query/observation/Motor costs, actual replay, protected-ink zero, and no-op. Observation-dependent choice must be auditable (not simply post-hoc scoring). For a first pilot, deterministic measured Percepts are acceptable as *instrumentation*, but do **not** call them a learned Eye or autonomous Skill.
+
+The independent Arena evaluator remains the sole owner of final 2px F1 and failure diagnostics. Later learned query/representation experiments belong to ImageProgram #55. Real-world full observation-based iteration is a new capability and is not passed by the existing smoke script.
 
 ## Branches
 
