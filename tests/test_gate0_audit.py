@@ -12,7 +12,7 @@ from adapters.imageprogram_reference.validate_gate0 import Gate0Failure, audit
 
 # Valid one-pixel PNG; still only a synthetic fixture, never real-episode evidence.
 MOCK_PNG = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9W3IftYAAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGP4DwABAQEAsTj2FAAAAABJRU5ErkJggg=="
 )
 
 
