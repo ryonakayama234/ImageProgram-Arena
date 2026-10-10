@@ -12,6 +12,14 @@ arena_root="$(cd "$(dirname "$0")/../.." && pwd -P)"
 model_root="$(cd "$arena_root/../ImageProgram" && pwd -P)"
 [[ -f "$model_root/scripts/first_contact.py" ]] || { echo 'Missing ImageProgram First Contact branch checkout' >&2; exit 2; }
 [[ -f "$arena_root/adapters/imageprogram_reference/public_reference_roi.py" ]] || { echo 'Missing Arena source intake branch checkout' >&2; exit 2; }
+# This pre-merge draft runner must exercise the exact paired review heads.
+# Refuse a wrong local branch rather than silently benchmark stale code.
+[[ "$(git -C "$model_root" branch --show-current)" == "feat/art1-first-contact-motor-v0" ]] || {
+  echo "ImageProgram must be on feat/art1-first-contact-motor-v0" >&2; exit 2;
+}
+[[ "$(git -C "$arena_root" branch --show-current)" == "feat/art1-first-contact-e2e-v0" ]] || {
+  echo "Arena must be on feat/art1-first-contact-e2e-v0" >&2; exit 2;
+}
 for root in "$model_root" "$arena_root"; do
   [[ -z "$(git -C "$root" status --porcelain --untracked-files=normal)" ]] || {
     echo "Dirty working copy; refusing unpinned run: $root" >&2; exit 2;
@@ -25,15 +33,14 @@ exec > >(tee -a "$work/run.log") 2>&1
 printf 'ART-1 First Contact run directory: %s\nImageProgram: %s\nArena: %s\n' "$work" "$model_sha" "$arena_sha"
 python_exec="$model_root/.venv/bin/python"
 [[ -x "$python_exec" ]] || { echo 'Missing ImageProgram .venv; run uv sync --locked --extra render in ImageProgram' >&2; exit 2; }
+# Do not report real-art success if a regression in an unrelated producer
+# or public/private Arena boundary is present. Match Gate 0 full-suite policy.
 (
   cd "$model_root"
-  uv run python -m unittest discover -s tests -p 'test_reference_geometry_v0.py' -v
-  uv run python -m unittest discover -s tests -p 'test_first_contact_v0.py' -v
-  uv run ruff check src/imageprogram/experiments/reference_geometry_v0.py \
-    src/imageprogram/experiments/first_contact_v0.py scripts/first_contact.py \
-    tests/test_reference_geometry_v0.py tests/test_first_contact_v0.py
+  uv run python scripts/check.py
+  uv run ruff check .
 )
-(cd "$arena_root" && "$python_exec" -m unittest discover -s tests -p 'test_public_reference_roi.py' -v)
+(cd "$arena_root" && "$python_exec" -m unittest discover -s tests -p 'test_*.py' -v)
 cd "$arena_root"
 "$python_exec" -m adapters.imageprogram_reference.source_artwork "$source_image" \
   --roi "$x0" "$y0" "$x1" "$y1" --source-family "$source_family" \
