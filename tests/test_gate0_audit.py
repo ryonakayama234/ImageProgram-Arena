@@ -1,11 +1,19 @@
 """Unit controls for the Gate 0 audit; these are mocks, not real source episodes."""
 
+import base64
+import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from adapters.imageprogram_reference.validate_gate0 import Gate0Failure, audit
+
+
+# Valid one-pixel PNG; still only a synthetic fixture, never real-episode evidence.
+MOCK_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9W3IftYAAAAASUVORK5CYII="
+)
 
 
 class Gate0AuditTests(unittest.TestCase):
@@ -38,8 +46,11 @@ class Gate0AuditTests(unittest.TestCase):
             images = {}
             for kind in ('initial', 'intermediate', 'final'):
                 filename = f'{label}-{kind}.png'
-                (self.review / filename).write_bytes(b'MOCK ONLY')
-                images[kind] = {'file': filename}
+                (self.review / filename).write_bytes(MOCK_PNG)
+                digest = 'sha256:' + hashlib.sha256(MOCK_PNG).hexdigest()
+                images[kind] = {
+                    'file': filename, 'sha256': digest, 'source_sha256': digest,
+                }
             sessions.append({
                 'label': label, 'fresh_source_replay_verified': True,
                 'replay_attested_by_source': True,
@@ -112,6 +123,23 @@ class Gate0AuditTests(unittest.TestCase):
         self.pack['sessions'][1]['source_program_semantic_hash'] = 'program-0'
         self.persist()
         with self.assertRaisesRegex(Gate0Failure, 'semantically identical'):
+            self.run_audit()
+
+    def test_reject_tampered_review_frame_bytes(self):
+        (self.review / 'analytic-final.png').write_bytes(b'fake-image')
+        with self.assertRaisesRegex(Gate0Failure, 'invalid PNG review frame'):
+            self.run_audit()
+
+    def test_reject_frame_digest_mismatch(self):
+        self.pack['sessions'][0]['images']['final']['sha256'] = 'sha256:' + '0' * 64
+        self.persist()
+        with self.assertRaisesRegex(Gate0Failure, 'review frame digest mismatch'):
+            self.run_audit()
+
+    def test_reject_review_path_traversal(self):
+        self.pack['sessions'][0]['images']['initial']['file'] = '../other.png'
+        self.persist()
+        with self.assertRaisesRegex(Gate0Failure, 'invalid review frame path'):
             self.run_audit()
 
     def test_reject_preparation_in_continuation_cost(self):
