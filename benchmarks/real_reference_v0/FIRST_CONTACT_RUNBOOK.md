@@ -21,6 +21,30 @@ From Arena checkout:
 
 Example only: replace file/coordinates with **your own** normalized post-EXIF source image size and ROI. Half-open bounding box x0 y0 x1 y1; choose a patch containing one line, no touching ROI boundary. Do not commit the source, ROI export, private episodes or logs.
 
+## Before user artwork arrives: synthetic pipeline smoke
+
+The repository now contains a deterministic **synthetic-only** input generator. On clean paired WSL2 branch checkouts with the render environment installed, run from the Arena checkout:
+
+```bash
+bash adapters/imageprogram_reference/run_first_contact_smoke.sh
+```
+
+It creates a high-contrast, open sinusoidal line as a local ignored `runs/art1-smoke-fixture-*/synthetic-open-line.png`, then invokes the **same** full-suite ART-1 pipeline as a real source (not a mock scorer). Expected evidence *if it passes*: three actual P1 Episodes (fine/coarse/noop), fresh source replay, independent Arena metrics, and A0 Review Pack. Inspect the printed `review/index.html`. The runner's stdout and files are local; a committed script is **not** execution evidence. The new smoke runner and current heads have not yet passed WSL2 checks.
+
+## Optional local `/Image` inbox
+
+User-provided references may be kept in either `/Image/` (an absolute WSL2 filesystem directory **outside** both Git checkouts) or a checkout-root `Image/` directory. Both Git checkouts now ignore root `Image/` to prevent accidental commits. Do not push files, crops, generated Review Packs, or raw provenance to GitHub. A folder's presence does not make its contents remotely accessible to ChatGPT or GitHub; actual ingestion runs in the local WSL2 process.
+
+Choose one image **explicitly**, record rights and a source-family identifier, and select a half-open pixel bbox containing one isolated dark *open* line with a few pixels of white margin. The filename is illustrative; the bbox must be adjusted for the actual source **after EXIF normalization**.
+
+```bash
+cd ~/src/ImageProgram-Arena
+bash adapters/imageprogram_reference/run_first_contact.sh \
+  /Image/your-permitted-source.png 30 40 150 160 source-family-A local-study-only
+```
+
+Allowed source types: PNG/JPEG, at most 16 MiB and 16,777,216 decoded pixels. The editable ROI must be 12–256 pixels wide and high, with area <=65,536 pixels. These are capability bounds, not an assertion that arbitrary artwork will reconstruct. `/Image/` at filesystem root may require local permissions; no directory is automatically created or synced by these scripts.
+
 ## What runs
 
 1. Arena SourceArtwork management intake validates bytes, EXIF normalization, source metadata, rights label, ROI integrity. The ROI exporter rechecks a bounded immutable byte snapshot against the recorded SHA-256, then decodes and crops **that same snapshot**, not a re-opened unchecked pathname.
