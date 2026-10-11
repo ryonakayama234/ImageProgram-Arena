@@ -1,5 +1,4 @@
 """Cross-repository synthetic P1 episode scoring, no private artwork required."""
-import hashlib
 import importlib.util
 import io
 import json
