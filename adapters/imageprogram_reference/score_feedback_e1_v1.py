@@ -82,7 +82,7 @@ def score_paired_e1_v1(
             or not isinstance(session.get("episodes"), dict)
             or set(session["episodes"]) != set(MODES)):
         raise FirstContactScoreError("invalid or falsely claimed E1 Model run")
-    verified, first_program, comparable, scores = {}, {}, {}, {}
+    verified, scores = {}, {}
     initial_states, seeds, bodies, budgets = [], [], [], []
     for mode in MODES:
         episode = run_dir / (mode + "_episode")
