@@ -5,9 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from adapters.imageprogram_reference.e1_review_v1 import build_causal_e1_review_v1
 from adapters.imageprogram_reference.reference_target_v1 import FirstContactScoreError
 from adapters.imageprogram_reference.run_e1_synthetic_v1 import run_synthetic_g2_v1
-from adapters.imageprogram_reference.e1_review_v1 import build_causal_e1_review_v1
 
 
 @unittest.skipUnless(
