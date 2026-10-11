@@ -70,6 +70,10 @@ def score_paired_e1_v1(
     png = _regular(public_dir / "reference_roi.png").read_bytes()
     # Independently recompute, validate task version/geometry/crop hash, E and P.
     target, editable, protected = target_and_masks_v1(task, png)
+    with Image.open(_regular(public_dir / "reference_roi.png")) as reference_image:
+        reference_pixels = reference_image.tobytes()
+    expected_reference_digest = "sha256:" + hashlib.sha256(reference_pixels).hexdigest()
+    expected_reference_frame = "reference-" + expected_reference_digest[7:23]
     if not target.any() or not protected.any() or not editable.any():
         raise FirstContactScoreError("unscorable v1 ROI target")
     session = _json(run_dir / "summary.json")
@@ -169,6 +173,11 @@ def score_paired_e1_v1(
             or receipt.get("canvas_sim_time_s") != on_events[split - 1].get("sim_end_ns") / 1e9):
         raise FirstContactScoreError("poststroke decision not tied to actual initial P1 prefix")
     intermediate = _frame(run_dir / "feedback_on_episode" / "frames" / f"{split:06d}.png")
+    if (
+        receipt.get("reference_digest") != expected_reference_digest
+        or receipt.get("reference_frame_id") != expected_reference_frame
+    ):
+        raise FirstContactScoreError("poststroke reference differs from permitted public crop")
     if receipt.get("canvas_image_sha256") != _world_hash(intermediate):
         raise FirstContactScoreError("decision used forged/nonreplayed World raster")
     difference = receipt.get("difference")
