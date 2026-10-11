@@ -18,6 +18,7 @@ from adapters.imageprogram_reference.drawing_review import source_replay
 from adapters.imageprogram_reference.reference_target_v1 import (
     FirstContactScoreError, score_terminal_v1, target_and_masks_v1,
 )
+from adapters.imageprogram_reference.verified_e1_snapshot_v1 import snapshot_e1_inputs
 
 FORMAT = "art1-e1-independent-episode-score-v1"
 MODES = ("noop", "feedback_off", "feedback_on")
@@ -62,9 +63,8 @@ def _transitions(path: Path) -> list[dict]:
     return values
 
 
-def score_paired_e1_v1(
-    public_dir: Path, run_dir: Path, output_file: Path
-) -> dict:
+def _score_frozen_e1_v1(public_dir: Path, run_dir: Path) -> dict:
+    """Score only immutable copied inputs, never the caller's mutable paths."""
     public_dir, run_dir = Path(public_dir), Path(run_dir)
     task = _json(public_dir / "task.json")
     png = _regular(public_dir / "reference_roi.png").read_bytes()
@@ -95,6 +95,13 @@ def score_paired_e1_v1(
         replay_report = source_replay(episode)
         if replay_report.get("verified") is not True or replay_report.get("status") != "program_exhausted":
             raise FirstContactScoreError("canonical source P1 replay failed")
+        # A model-supplied replay JSON is only an attestation: re-execute the
+        # digest-pinned Episode and compare all independently checkable fields.
+        original_replay = _json(run_dir / (mode + "_replay.json"))
+        for field in ("verified", "status", "transitions", "final_state_hash",
+                      "goal_evaluated"):
+            if original_replay.get(field) != replay_report.get(field):
+                raise FirstContactScoreError("Model replay receipt diverges from fresh replay")
         request = _json(episode / "request.json")
         program = _json(episode / "program.json")
         result = _json(episode / "result.json")
@@ -194,9 +201,6 @@ def score_paired_e1_v1(
             or (decision["kind"] == "execute" and repair_count == 0)):
         raise FirstContactScoreError("repair decision is not supported by replayed observation")
     # All three actual P1 episodes, sidecars and independent evaluator agree.
-    output_file = Path(output_file)
-    if output_file.is_symlink() or output_file.exists():
-        raise FirstContactScoreError("independent score output must not pre-exist")
     report = {
         "format": FORMAT,
         "claim": "independently scored real P1 episode rasters; human review pending",
@@ -211,7 +215,29 @@ def score_paired_e1_v1(
         ),
         "human_accepted": False,
     }
-    output_file.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return report
+
+
+def score_paired_e1_v1(
+    public_dir: Path, run_dir: Path, output_file: Path
+) -> dict:
+    """Replay and score a single pinned comparative snapshot transaction."""
+    output_file = Path(output_file)
+    if output_file.is_symlink() or output_file.exists():
+        raise FirstContactScoreError("independent score output must not pre-exist")
+    with snapshot_e1_inputs(public_dir, run_dir) as pinned:
+        report = _score_frozen_e1_v1(pinned.public_dir, pinned.sessions_dir)
+        report["evidence_snapshot"] = {
+            "source": "manifest_sha256_verified_private_copy",
+            "episode_manifest_sha256": pinned.manifest_digests,
+            "input_sha256": pinned.input_digests,
+            "original_paths_reopened_after_snapshot": False,
+            "physics_replay": "ImageProgram canonical source runner",
+            "target_score": "Arena independent v1 target/mask",
+        }
+    # Exclusive creation prevents a concurrent caller replacing an existing score.
+    with output_file.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
     return report
 
 
