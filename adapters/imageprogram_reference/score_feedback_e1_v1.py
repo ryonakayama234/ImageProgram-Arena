@@ -16,7 +16,9 @@ from PIL import Image
 
 from adapters.imageprogram_reference.drawing_review import source_replay
 from adapters.imageprogram_reference.reference_target_v1 import (
-    FirstContactScoreError, score_terminal_v1, target_and_masks_v1,
+    FirstContactScoreError,
+    score_terminal_v1,
+    target_and_masks_v1,
 )
 from adapters.imageprogram_reference.verified_e1_snapshot_v1 import snapshot_e1_inputs
 
