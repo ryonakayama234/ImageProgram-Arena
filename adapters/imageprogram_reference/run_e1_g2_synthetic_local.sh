@@ -5,7 +5,7 @@ set -euo pipefail
 arena_root="$(cd "$(dirname "$0")/../.." && pwd -P)"
 model_root="$(cd "$arena_root/../ImageProgram" && pwd -P)"
 model_branch="feat/art1-e1-live-p1-session-v1"
-arena_branch="feat/art1-e1-g2-paired-synthetic-v1"
+arena_branch="feat/art1-e1-causal-continuity-review-v0"
 model_sha="6d8e6399a2b0a44d08054a08b71b4a68d4d9e374"
 
 [[ "$(git -C "$model_root" rev-parse HEAD)" == "$model_sha" ]] || {
@@ -51,14 +51,20 @@ printf 'G2 UV=%s\n' "$(uv --version)"
     adapters/imageprogram_reference/verified_e1_snapshot_v1.py \
     adapters/imageprogram_reference/score_feedback_e1_v1.py \
     adapters/imageprogram_reference/run_e1_synthetic_v1.py \
+    adapters/imageprogram_reference/continuity_v0.py \
+    adapters/imageprogram_reference/e1_review_v1.py \
     tests/test_verified_e1_snapshot_v1.py \
-    tests/test_e1_paired_synthetic_v1.py
+    tests/test_e1_paired_synthetic_v1.py \
+    tests/test_continuity_v0.py \
+    tests/test_e1_review_v1.py
   "$py" -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee "$work/arena-full-tests.log"
   "$py" -m unittest discover -s tests -p 'test_verified_e1_snapshot_v1.py' -v 2>&1 | tee "$work/snapshot-tests.log"
   "$py" -m unittest discover -s tests -p 'test_score_feedback_e1_v1.py' -v 2>&1 | tee "$work/paired-score-tests.log"
   "$py" -m unittest discover -s tests -p 'test_e1_paired_synthetic_v1.py' -v 2>&1 | tee "$work/paired-g2-tests.log"
+  "$py" -m unittest discover -s tests -p 'test_continuity_v0.py' -v 2>&1 | tee "$work/continuity-tests.log"
+  "$py" -m unittest discover -s tests -p 'test_e1_review_v1.py' -v 2>&1 | tee "$work/review-v1-tests.log"
 )
-for logfile in "$work/paired-score-tests.log" "$work/paired-g2-tests.log"; do
+for logfile in "$work/paired-score-tests.log" "$work/paired-g2-tests.log" "$work/review-v1-tests.log"; do
   grep -Eq '^Ran [1-9][0-9]* tests? in ' "$logfile" || {
     echo "Paired test count missing: $logfile" >&2; exit 3;
   }
@@ -74,3 +80,5 @@ done
 printf '\nG2_SYNTHETIC_GATE_COMPLETE_HUMAN_REVIEW_PENDING\n'
 printf 'Synthetic evidence: %s\n' "$work/experiment/provenance.json"
 printf 'Underdraw human review: %s\n' "$work/experiment/underdraw/review/index.html"
+
+printf 'Causal review: %s\n' "$work/experiment/underdraw/review_e1_v1/index.html"
