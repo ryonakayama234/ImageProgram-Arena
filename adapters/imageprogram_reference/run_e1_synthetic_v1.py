@@ -13,6 +13,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from adapters.imageprogram_reference.drawing_review import create_review_pack
+from adapters.imageprogram_reference.e1_review_v1 import build_causal_e1_review_v1
 from adapters.imageprogram_reference.public_reference_roi_v1 import (
     export_permitted_roi_v1,
 )
@@ -82,6 +83,10 @@ def run_synthetic_g2_v1(output: Path) -> dict:
         score = score_paired_e1_v1(
             public, sessions, case_root / "arena_independent_score.json"
         )
+        # Retrospective *new* E1 view; legacy v0 Review Pack remains intact.
+        causal_review = build_causal_e1_review_v1(
+            public, sessions, case_root / "review_e1_v1"
+        )
         for mode in MODES:
             if mode not in score["replay_verified_arms"]:
                 raise RuntimeError("an actual P1 arm was not source-replay verified")
@@ -122,6 +127,8 @@ def run_synthetic_g2_v1(output: Path) -> dict:
         checks[case] = bool(passed)
         cases[case] = {
             "initial_fraction": fraction,
+            "continuity": causal_review["continuity"],
+            "decision_frame_index": causal_review["model_actual_eye_decision_frame_index"],
             "decision_kind": decision,
             "correction_motor_commands": extra_motor,
             "delta_f1_on_minus_off": score["delta_f1_on_minus_off"],
