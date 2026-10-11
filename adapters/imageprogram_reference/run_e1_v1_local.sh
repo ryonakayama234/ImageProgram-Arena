@@ -14,7 +14,11 @@ source_family="$6"; rights="$7"; initial_fraction="$8"
 arena_root="$(cd "$(dirname "$0")/../.." && pwd -P)"
 model_root="$(cd "$arena_root/../ImageProgram" && pwd -P)"
 model_branch="feat/art1-e1-live-p1-session-v1"
-arena_branch="feat/art1-e1-episode-independent-score-v1"
+model_sha="6d8e6399a2b0a44d08054a08b71b4a68d4d9e374"
+arena_branch="feat/art1-e1-g2-paired-synthetic-v1"
+[[ "$(git -C "$model_root" rev-parse HEAD)" == "$model_sha" ]] || {
+  echo "ImageProgram must be pinned to tested Model PR #81 SHA" >&2; exit 2;
+}
 [[ -f "$model_root/scripts/art1_feedback_session_v1.py" ]] || {
   echo "Missing local ImageProgram E1 v1 branch" >&2; exit 2;
 }
@@ -33,6 +37,10 @@ python_exec="$model_root/.venv/bin/python"
 [[ -x "$python_exec" ]] || {
   echo "Use uv sync --locked --extra render in ImageProgram first" >&2; exit 2;
 }
+(
+  cd "$arena_root"
+  "$python_exec" -c "from imageprogram.experiments.art1_feedback_session_v1 import run_feedback_session_v1; print('PAIRED_MODEL_IMPORT_OK')"
+)
 mkdir -p "$arena_root/runs"
 work="$(mktemp -d "$arena_root/runs/art1-e1-v1-XXXXXXXX")"
 exec > >(tee -a "$work/run.log") 2>&1
