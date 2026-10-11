@@ -13,7 +13,9 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from adapters.imageprogram_reference.drawing_review import create_review_pack
-from adapters.imageprogram_reference.public_reference_roi_v1 import export_permitted_roi_v1
+from adapters.imageprogram_reference.public_reference_roi_v1 import (
+    export_permitted_roi_v1,
+)
 from adapters.imageprogram_reference.score_feedback_e1_v1 import score_paired_e1_v1
 from adapters.imageprogram_reference.source_artwork import ingest_local_source
 

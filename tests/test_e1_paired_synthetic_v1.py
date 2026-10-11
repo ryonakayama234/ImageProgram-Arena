@@ -56,7 +56,7 @@ class E1G2PairedSyntheticV1Tests(unittest.TestCase):
             task = json.loads((out / "public_roi" / "task.json").read_text())
             self.assertEqual(manifest["format"], "arena-local-source-roi-v0")
             self.assertEqual(task["format"], "arena-public-reference-roi-v1")
-            self.assertEqual(set(p.name for p in (out / "public_roi").iterdir()),
+            self.assertEqual({p.name for p in (out / "public_roi").iterdir()},
                              {"task.json", "reference_roi.png"})
             self.assertNotIn("generated-art1-e1-g2", json.dumps(task))
             self.assertNotIn("source_family", json.dumps(task))

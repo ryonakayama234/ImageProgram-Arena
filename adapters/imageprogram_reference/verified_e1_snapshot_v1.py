@@ -6,14 +6,13 @@ private temporary copies. No SourceArtwork originals enter this snapshot.
 """
 from __future__ import annotations
 
-import json
 import os
 import stat
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 from adapters.imageprogram_reference.drawing_review import (
     MAX_PRIVATE_REPLAY_BYTES,

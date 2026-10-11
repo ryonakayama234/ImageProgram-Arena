@@ -85,9 +85,11 @@ class FrozenE1SnapshotV1Tests(unittest.TestCase):
             root = Path(temp)
             public, sessions = _fixture(root)
             (sessions / "noop_episode" / "final.png").write_bytes(b"wrong")
-            with self.assertRaises(FirstContactScoreError):
-                with snapshot_e1_inputs(public, sessions):
-                    self.fail("tampered original entered trusted snapshot")
+            with (
+                self.assertRaises(FirstContactScoreError),
+                snapshot_e1_inputs(public, sessions),
+            ):
+                self.fail("tampered original entered trusted snapshot")
 
     def test_rejects_forged_public_private_inventory(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -131,9 +133,11 @@ class FrozenE1SnapshotV1Tests(unittest.TestCase):
             public, sessions = _fixture(root)
             extra = public / "private_source.json"
             extra.write_text("{}")
-            with self.assertRaises(FirstContactScoreError):
-                with snapshot_e1_inputs(public, sessions):
-                    self.fail("unexpected public input accepted")
+            with (
+                self.assertRaises(FirstContactScoreError),
+                snapshot_e1_inputs(public, sessions),
+            ):
+                self.fail("unexpected public input accepted")
             extra.unlink()
             os.link(sessions / "summary.json", sessions / "shared-hardlink.json")
             with self.assertRaises(FirstContactScoreError):
