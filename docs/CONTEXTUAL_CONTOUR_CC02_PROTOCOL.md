@@ -1,3 +1,5 @@
+> **2026-10-15 decision update:** [ADR-CC02-001: Arena独立診断・Oracle arms・停止/保留判定](ADR_CC02_001_PERCEPTION_REASONING.md). The CC-02d bundled-next-step recommendation below is HISTORICAL and superseded in execution order; this document's prior results, hashes and frozen confirmation state are retained without retrospective adjustment.
+
 # CC-02a/b/c — hard-pair protocol, System/Data and pre-change v2 diagnostic
 2026-10-14 JST | Status: **hard development tested in isolated local mirror; original Code checkout full-suite NOT RUN. Confirmation NOT SCORED; Canvas NOT RUN.**
 
