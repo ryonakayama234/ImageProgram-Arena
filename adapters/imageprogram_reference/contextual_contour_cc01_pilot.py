@@ -10,7 +10,6 @@ Never publish full private manifests/annotations by default; the output path is 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import subprocess
 from dataclasses import asdict
