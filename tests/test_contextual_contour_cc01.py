@@ -6,7 +6,7 @@ from adapters.imageprogram_reference.contextual_contour_cc01 import create_pair,
 class ContextualContourCC01ReviewTests(unittest.TestCase):
     def test_pair_same_local_and_private_label_absent(self):
         families = {}
-        for split in ("development", "confirmation"):
+        for split in ("development", "rotation_probe"):
             seen = set()
             for i in range(6):
                 cases = create_pair(i, split=split)
@@ -21,7 +21,7 @@ class ContextualContourCC01ReviewTests(unittest.TestCase):
                     self.assertIn(private.correct_action, ("continue", "stop"))
             self.assertEqual(len(seen), 1)
             families[split] = next(iter(seen))
-        self.assertNotEqual(families["development"], families["confirmation"])
+        self.assertNotEqual(families["development"], families["rotation_probe"])
 
     def test_invalid_pair_rejected(self):
         cases = create_pair(0)
