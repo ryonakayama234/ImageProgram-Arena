@@ -1,6 +1,8 @@
 """CC-01 independently verify identical local evidence, private labels and split."""
 import unittest
+
 import numpy as np
+
 from adapters.imageprogram_reference.contextual_contour_cc01 import create_pair, validate_pair
 
 class ContextualContourCC01ReviewTests(unittest.TestCase):
