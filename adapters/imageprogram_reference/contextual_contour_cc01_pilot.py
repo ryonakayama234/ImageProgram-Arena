@@ -15,8 +15,6 @@ import subprocess
 from dataclasses import asdict
 from pathlib import Path
 
-from imageprogram.models.contextual_contour_cc01 import VERSION as MODEL_VERSION
-from imageprogram.models.contextual_contour_cc01 import observe_graph, select
 from adapters.imageprogram_reference.contextual_contour_cc01 import (
     VERSION as ARENA_VERSION,
     aggregate,
@@ -24,6 +22,8 @@ from adapters.imageprogram_reference.contextual_contour_cc01 import (
     evaluate,
     validate_pair,
 )
+from imageprogram.models.contextual_contour_cc01 import VERSION as MODEL_VERSION
+from imageprogram.models.contextual_contour_cc01 import observe_graph, select
 
 
 def _git_sha(path):
