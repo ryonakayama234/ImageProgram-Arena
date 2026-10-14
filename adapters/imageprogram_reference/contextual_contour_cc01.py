@@ -36,10 +36,10 @@ def _digest(arr):
 def create_pair(index, *, split="development"):
     """Same local evidence/anchor per pair; opposite *private* action labels.
 
-    Development horizontal and confirmation vertical are different procedural
+    Development horizontal and rotation_probe vertical are different procedural
     template families, NOT independent real source families.
     """
-    if type(index) is not int or not 0 <= index < 6 or split not in ("development", "confirmation"):
+    if type(index) is not int or not 0 <= index < 6 or split not in ("development", "rotation_probe"):
         raise ValueError("invalid-pair")
     y = 28 + index
     shift = index % 3
@@ -57,7 +57,7 @@ def create_pair(index, *, split="development"):
         else:
             # Nearby but distinct: a perpendicular branch is not forward support.
             _paint_line(raster, (60 + shift, y + 5), (60 + shift, y + 16))
-        if split == "confirmation":
+        if split == "rotation_probe":
             raster = np.ascontiguousarray(raster.T)
             focus = (12, 6, 60, 55)
             anchor = (y + 0.5, 10 + shift + 0.5)
