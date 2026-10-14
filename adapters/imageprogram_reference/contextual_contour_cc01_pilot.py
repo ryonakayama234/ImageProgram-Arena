@@ -4,7 +4,7 @@ Run from the Arena checkout with ImageProgram installed:
     python -m adapters.imageprogram_reference.contextual_contour_cc01_pilot \
         --split development --out /tmp/cc01-dev.json
     python -m adapters.imageprogram_reference.contextual_contour_cc01_pilot \
-        --split confirmation --out /tmp/cc01-confirm.json
+        --split rotation_probe --out /tmp/cc01-confirm.json
 Never publish full private manifests/annotations by default; the output path is local.
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ def _git_sha(path):
 
 
 def run(split):
-    if split not in ("development", "confirmation"):
+    if split not in ("development", "rotation_probe"):
         raise ValueError("unknown-split")
     rows = []
     pair_manifest = []
@@ -85,7 +85,7 @@ def run(split):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--split", required=True, choices=("development", "confirmation"))
+    parser.add_argument("--split", required=True, choices=("development", "rotation_probe"))
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
     report = run(args.split)
