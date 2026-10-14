@@ -94,3 +94,6 @@ This is a proof about experimental identifiability, **not** a new ImageProgram p
 
 ### Follow-up / review
 For every CC-01 experiment PR, update the system flow, ER/field version, changed test contract, full failed and held outcomes, and next decision **together**. Keep all original art/private annotations/private episodes local; git contains hashes and safe statistical summaries. Do not merge or mark PASS on the basis of this CC-00 planning-only PR.
+
+## CC-01 follow-through (2026-10-14)
+New independent record: [CC-01 synthetic pair generator, evaluator, System/ER and result ledger](CONTEXTUAL_CONTOUR_CC01_RESULTS.md). Rotation probe is correlated and is NOT independent confirmation; Canvas/Replay remains not-run.
