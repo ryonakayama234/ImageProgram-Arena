@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 from dataclasses import asdict, dataclass
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -57,12 +58,12 @@ def _canonical_sha(data: object) -> str:
 def _arc_points(path: tuple[tuple[int, int], ...]) -> set[tuple[int, int]]:
     """Use the synthetic source rasterizer's endpoint-inclusive rounding rule."""
     points: set[tuple[int, int]] = set()
-    for (x0, y0), (x1, y1) in zip(path, path[1:]):
+    for (x0, y0), (x1, y1) in pairwise(path):
         steps = max(abs(x1 - x0), abs(y1 - y0))
         for j in range(steps + 1):
             a = j / max(1, steps)
-            points.add((int(round(x0 + a * (x1 - x0))),
-                        int(round(y0 + a * (y1 - y0)))))
+            points.add((round(x0 + a * (x1 - x0)),
+                        round(y0 + a * (y1 - y0))))
     return points
 
 
@@ -199,10 +200,14 @@ def audit_continue(public: dict, graph: object, decision: object,
 def run_development_arc_audit() -> dict:
     """Development ONLY. Import Model for decisions, then private evaluator."""
     from imageprogram.models.contextual_contour_cc01 import (
-        VERSION, observe_graph, select,
+        VERSION,
+        observe_graph,
+        select,
     )
+
     from adapters.imageprogram_reference.contextual_contour_cc02_tasks import (
-        create_development_pair, validate_pair,
+        create_development_pair,
+        validate_pair,
     )
     if VERSION != "contextual-contour-cc01-v2":
         raise ValueError("frozen-v2-required")

@@ -1,6 +1,7 @@
 """CC-02-V2: provenance, split isolation and false-join ledger invariants."""
 import importlib.util
 import unittest
+
 from adapters.imageprogram_reference.cc02_v2_ledger import (
     ARMS,
     EXPECTED_MODEL_VERSION,
@@ -9,8 +10,8 @@ from adapters.imageprogram_reference.cc02_v2_ledger import (
     REQUIRED_CASES,
     canonical,
     excluded_paths,
-    private_grade,
     predict,
+    private_grade,
     sha256,
     verify_receipt,
 )
@@ -86,7 +87,8 @@ class LedgerV2ContractTests(unittest.TestCase):
 
     def test_negative_strokes_and_ambiguous_contract(self):
         from adapters.imageprogram_reference.contextual_contour_cc02_tasks import (
-            create_controls, create_development_pair,
+            create_controls,
+            create_development_pair,
         )
         stop = create_development_pair(4)[1][1]
         forbidden = excluded_paths("dev-04-m1", stop)
@@ -106,7 +108,10 @@ class LedgerV2ContractTests(unittest.TestCase):
         # source generator are enforced inside predict/grade. Confirmation
         # must never be imported or invoked by either stage.
         import unittest.mock
-        from adapters.imageprogram_reference import contextual_contour_cc02_tasks as tasks
+
+        from adapters.imageprogram_reference import (
+            contextual_contour_cc02_tasks as tasks,
+        )
         with unittest.mock.patch.object(tasks, "create_confirmation_pair",
                                         side_effect=AssertionError("sealed-use")):
             prediction = predict()

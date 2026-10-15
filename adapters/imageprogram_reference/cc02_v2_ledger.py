@@ -72,14 +72,17 @@ def public_cases():
 
 
 def predict() -> dict:
-    import numpy as np
     import imageprogram
+    import numpy as np
     from imageprogram.models.contextual_contour_cc01 import (
         VERSION,
         observe_graph,
         select,
     )
-    from adapters.imageprogram_reference.contextual_contour_cc02_tasks import VERSION as AV
+
+    from adapters.imageprogram_reference.contextual_contour_cc02_tasks import (
+        VERSION as AV,
+    )
 
     if VERSION != EXPECTED_MODEL_VERSION:
         raise ValueError("frozen-v2-required")
@@ -155,7 +158,9 @@ def verify_receipt(payload: dict, *, expected_sha: str) -> dict:
 
 def private_cases():
     from adapters.imageprogram_reference.contextual_contour_cc02_tasks import (
-        create_controls, create_development_pair, validate_pair,
+        create_controls,
+        create_development_pair,
+        validate_pair,
     )
     pair_manifests = []
     for i in range(6):

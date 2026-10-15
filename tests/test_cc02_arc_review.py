@@ -1,11 +1,13 @@
 """Reviewer unit tests: no confirmation inputs or hidden answer passed to Model."""
-from dataclasses import dataclass
 import unittest
+from dataclasses import dataclass
 
 import numpy as np
 
 from adapters.imageprogram_reference.cc02_arc_review import (
-    _arc_points, _components_from_public, audit_continue,
+    _arc_points,
+    _components_from_public,
+    audit_continue,
     development_continue_annotation,
 )
 
