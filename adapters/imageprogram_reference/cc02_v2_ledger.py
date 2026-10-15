@@ -61,7 +61,8 @@ def write_once(path: Path, payload: dict) -> None:
 def public_cases():
     """Never return target labels in the prediction interface."""
     from adapters.imageprogram_reference.contextual_contour_cc02_tasks import (
-        create_controls, create_development_pair,
+        create_controls,
+        create_development_pair,
     )
     for i in range(6):
         for j, (public, _unused_private) in enumerate(create_development_pair(i)):
@@ -74,7 +75,9 @@ def predict() -> dict:
     import numpy as np
     import imageprogram
     from imageprogram.models.contextual_contour_cc01 import (
-        VERSION, observe_graph, select,
+        VERSION,
+        observe_graph,
+        select,
     )
     from adapters.imageprogram_reference.contextual_contour_cc02_tasks import VERSION as AV
 
@@ -207,7 +210,9 @@ def _ns_graph(snapshot: dict) -> SimpleNamespace:
 def private_grade(payload: dict, *, expected_sha: str) -> dict:
     """Imports no Model module. Saved frozen graph + public replay only."""
     from adapters.imageprogram_reference.cc02_arc_review import (
-        _arc_points, _verified_node_supports, audit_continue,
+        _arc_points,
+        _verified_node_supports,
+        audit_continue,
         development_continue_annotation,
     )
     registry = verify_receipt(payload, expected_sha=expected_sha)
