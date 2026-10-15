@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CC-02-V2: paired full-checkout verification and PUBLIC-only prediction.
 # User supplies TWO exact 40-character PR branch HEADs. NO held-out scoring.
-# No CI or cloud GPU is launched. Run from WSL2 with git/uv/Python3.12 access.
+# No CI or cloud GPU is launched. Run from WSL2 with git/uv access.
 set -Eeuo pipefail
 
 if [[ $# -ne 3 ]]; then
@@ -21,28 +21,37 @@ if [[ "$ROOT" != /* ]] || [[ -e "$ROOT" ]]; then
   echo "Evidence root must be a NEW absolute path (never overwrite)" >&2
   exit 64
 fi
-for command in git uv python3.12; do
+for command in git uv; do
   if ! command -v "$command" >/dev/null; then
     echo "Missing: $command" >&2
     exit 69
   fi
 done
+if ! PY312="$(uv python find 3.12)"; then
+  echo 'Install project Python with: uv python install 3.12' >&2
+  exit 69
+fi
+if [[ ! -x "$PY312" ]]; then
+  echo "uv Python path not executable: $PY312" >&2
+  exit 69
+fi
 mkdir -m 700 -p "$ROOT"
 ROOT="$(realpath "$ROOT")"
 exec > >(tee "$ROOT/terminal.log") 2>&1
 printf 'MODEL_SHA=%s\nARENA_SHA=%s\n' "$MODEL_SHA" "$ARENA_SHA" |
   tee "$ROOT/checked-input-shas.txt"
+echo 'Cloning PRIVATE Model; if denied, use: gh auth login && gh auth setup-git'
 git clone https://github.com/ryonakayama234/ImageProgram.git "$ROOT/Model"
 git clone https://github.com/ryonakayama234/ImageProgram-Arena.git "$ROOT/Arena"
 git -C "$ROOT/Model" checkout --detach "$MODEL_SHA"
 git -C "$ROOT/Arena" checkout --detach "$ARENA_SHA"
 test "$(git -C "$ROOT/Model" rev-parse HEAD)" = "$MODEL_SHA"
 test "$(git -C "$ROOT/Arena" rev-parse HEAD)" = "$ARENA_SHA"
-printf 'Python: '; python3.12 --version
+printf 'Python: '; "$PY312" --version
 printf 'uv: '; uv --version
 
 cd "$ROOT/Model"
-uv sync --locked --python python3.12 --extra render
+uv sync --locked --python "$PY312" --extra render
 uv run --no-sync python scripts/check.py
 uv run --no-sync ruff check .
 uv run --no-sync imageprogram doctor
