@@ -160,7 +160,9 @@ def audit_continue(public: dict, graph: object, decision: object,
     union = set().union(*(supports[node_id] for node_id in per_node)) if per_node else set()
     total_coverage = _coverage(arc, union, tolerance_px)
     local_neighbor = decision.selected_nodes[1] if len(decision.selected_nodes) >= 2 else None
-    if not eligible:
+    if not eligible and total_coverage >= min_coverage:
+        stage = "UNRESOLVED_FRAGMENTED_TARGET"
+    elif not eligible:
         stage = "P_CANDIDATE_ABSENT"
     elif local_neighbor is None:
         stage = "UNRESOLVED_LOCAL_PATH"
@@ -204,8 +206,8 @@ def run_development_arc_audit() -> dict:
     )
     if VERSION != "contextual-contour-cc01-v2":
         raise ValueError("frozen-v2-required")
-    # Model receives ONLY the public data. Archive results before looking up
-    # the private arc. The annotations NEVER enter observe_graph/select.
+    # Model receives ONLY public data; all decisions precede private review.
+    # The annotations NEVER enter observe_graph/select.
     pre_review = []
     for i in range(6):
         pair = create_development_pair(i)
@@ -216,6 +218,13 @@ def run_development_arc_audit() -> dict:
                               max_pixels=8192)
         decision = select(graph, public["anchor_px"], arm="B", max_edges=64)
         pre_review.append((i, public, graph, decision))
+    receipts = [{"pair_id": f"dev-{i:02d}", "public_sha256": public["raster_digest"],
+                 "candidate_set_sha256": graph.candidate_set_sha256,
+                 "action": decision.action, "reason": decision.reason,
+                 "selected_nodes": list(decision.selected_nodes),
+                 "node_count": len(graph.nodes), "edge_count": len(graph.edges)}
+                for i, public, graph, decision in pre_review]
+    receipt_sha = _canonical_sha(receipts)
     reviews = [audit_continue(public, graph, decision,
                               development_continue_annotation(i))
                for i, public, graph, decision in pre_review]
@@ -227,6 +236,8 @@ def run_development_arc_audit() -> dict:
         "source_review": "UNBLINDED; requires independent adjudication",
         "confirmation": "NOT_RUN",
         "real_art": "NOT_RUN",
+        "decision_receipts_before_review": receipts,
+        "receipt_sha256": receipt_sha,
         "reviews": reviews,
         "stage_counts": {stage: sum(r["diagnostic_stage"] == stage for r in reviews)
                          for stage in sorted({r["diagnostic_stage"] for r in reviews})},
