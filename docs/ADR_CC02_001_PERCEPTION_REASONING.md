@@ -86,3 +86,14 @@ A1, strong collinearity C, B and B-shuffle must share the same graph **within ea
 - **REOPEN training** only after provenance-cleared corpus + frozen independent family + robust success/failure episode records, with baseline and contamination controls.
 
 Record search keys: ADR-CC02-001, user-design-review-20261015, perception-first, Oracle-P, Oracle-R, stage-review, candidate-arc-recall, drawing-deferred, CC-02-V, CC-02-P, CC-02-R, CC-02-PAIR, CC-03-DRAW. On EACH work unit update System/ER/Experiment/Decision as one evidence-linked package. CC-01/CC-02c negative results, original labels and confirmation hash remain historic. No merge, paid CI, original/private art commit.
+
+
+## 6. Evaluator implementation guardrail / causal audit (2026-10-15)
+
+**Operational trackers:** [CC-02-V #99](https://github.com/ryonakayama234/ImageProgram/issues/99), [CC-02-P #100](https://github.com/ryonakayama234/ImageProgram/issues/100), [CC-02-R #101](https://github.com/ryonakayama234/ImageProgram/issues/101).
+
+**Do not conflate P/G/R:** A fixed relation generator applied to changed fragments produces different edges; P1-R0 vs P0-R0 is a *perception-pipeline* effect, not a proof of pure P improvement. Grade fragment arc support *before* G. For G0/G1 compare the SAME frozen fragments. For R0/R1 compare the SAME frozen candidate Relation graph. A1/C/B/shuffle graph identity holds only per input and fixed P/G variant. Annotate incompatible interfaces explicitly.
+
+**Oracle contamination control:** development-only Oracle-P must include all relevant true, distractor and ambiguous candidate alternatives; injecting only the correct target chain or class-indicative ordering trivially leaks the answer. Oracle-R may select only among the Model-proposed candidate elements and must count impossible target paths as unavailable. Grade oracle-assisted and unassisted arms in separate tables; never include oracles in confirmation capability metrics.
+
+**Art-complexity admission:** for rights-cleared original ROIs, stratify branch/overlap/variable line width/faint ink/dense distractors and genuinely unidentifiable topology; preserve provenance and distinct source family. No unverified Drive imagery or raw private target labels in Git. Missing legal/provenance review means NOT RUN, not passing the real-art requirement. Current CC-02 negative records, frozen confirmation and Model code are unchanged.
