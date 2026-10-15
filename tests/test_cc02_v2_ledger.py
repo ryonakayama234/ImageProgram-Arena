@@ -2,9 +2,17 @@
 import importlib.util
 import unittest
 from adapters.imageprogram_reference.cc02_v2_ledger import (
-    ARMS, EXPECTED_MODEL_VERSION, FIXED, PROTOCOL,
-    REQUIRED_CASES, canonical, excluded_paths, private_grade, predict,
-    sha256, verify_receipt,
+    ARMS,
+    EXPECTED_MODEL_VERSION,
+    FIXED,
+    PROTOCOL,
+    REQUIRED_CASES,
+    canonical,
+    excluded_paths,
+    private_grade,
+    predict,
+    sha256,
+    verify_receipt,
 )
 
 
