@@ -1,3 +1,7 @@
+## Latest execution — 2026-10-16
+
+[V2 actual source-derived reproduction / System / ER / initial failures / all results / next gate](CC02_V2_EXECUTION_20261016.md). 3P/2G/1action reproduced, not new ability. #99 independent annotation still OPEN; confirmation untouched.
+
 # Contextual Contour — Arena decision / evaluation index
 Reviewed 2026-10-15 JST. Keys: H-ContextualContour-01, ADR-CC02-001, CC-02-V, CC-02-P, CC-02-R, Oracle-P, Oracle-R, drawing-deferred.
 

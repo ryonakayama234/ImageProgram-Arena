@@ -1,3 +1,5 @@
+> **2026-10-16 execution update:** SHA-verified source-derived reproduction, complete Model/Arena test matrix and separate anchored prediction/grade have now run. Independent annotation remains pending; #99 stays OPEN. See [executed System/ER/Experiment/Decision](CC02_V2_EXECUTION_20261016.md). The NOT_RUN statements below describe the earlier authoring checkpoint.
+
 # CC-02-V2: paired-checkout reproduction and two-phase DEV evaluation
 
 Date: 2026-10-15 JST. Status: IMPLEMENTED IN DRAFT, **not executed end-to-end**.
