@@ -19,3 +19,8 @@ Do NOT count oracle-P/R injected truth as real Model skill, do NOT leak labels/f
 ## Active implementation trackers (2026-10-15)
 
 [#99 verify and arc-audit](https://github.com/ryonakayama234/ImageProgram/issues/99) → [#100 private P-candidate review](https://github.com/ryonakayama234/ImageProgram/issues/100) and [#101 G/R matched-graph review](https://github.com/ryonakayama234/ImageProgram/issues/101) → eventually factorized integrated test, sealed confirmation, CC-03. The distinction between **pure P**, **G on frozen fragments**, and **R on frozen relations** is now required by Arena ADR-CC02-001. Oracle-P must provide distractors, not an answer-encoded target-only graph. No additional experiments/CI/merge occurred from this index update.
+
+
+### Annotation admission and blind stage review (2026-10-15)
+
+Before any new P/G/R evidence claim, use the [Arena-private L0/L1/L2 annotated visible-arc protocol](CC02_PRIVATE_ANNOTATION_PROTOCOL.md); human annotation is scoped to uncertain/difficult authorized ROIs, with blinded review and true arc overlap instead of bounding-box-center proxy. **Protocol is written; samples are not yet annotated or evaluated.**
