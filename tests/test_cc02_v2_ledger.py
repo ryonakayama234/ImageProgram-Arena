@@ -1,8 +1,6 @@
 """CC-02-V2: provenance, split isolation and false-join ledger invariants."""
 import importlib.util
 import unittest
-from types import SimpleNamespace
-
 from adapters.imageprogram_reference.cc02_v2_ledger import (
     ARMS, EXPECTED_MODEL_VERSION, FIXED, PROTOCOL,
     REQUIRED_CASES, canonical, excluded_paths, private_grade, predict,
