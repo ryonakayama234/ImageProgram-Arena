@@ -97,3 +97,8 @@ Record search keys: ADR-CC02-001, user-design-review-20261015, perception-first,
 **Oracle contamination control:** development-only Oracle-P must include all relevant true, distractor and ambiguous candidate alternatives; injecting only the correct target chain or class-indicative ordering trivially leaks the answer. Oracle-R may select only among the Model-proposed candidate elements and must count impossible target paths as unavailable. Grade oracle-assisted and unassisted arms in separate tables; never include oracles in confirmation capability metrics.
 
 **Art-complexity admission:** for rights-cleared original ROIs, stratify branch/overlap/variable line width/faint ink/dense distractors and genuinely unidentifiable topology; preserve provenance and distinct source family. No unverified Drive imagery or raw private target labels in Git. Missing legal/provenance review means NOT RUN, not passing the real-art requirement. Current CC-02 negative records, frozen confirmation and Model code are unchanged.
+
+
+## 2026-10-15 operational annotation implementation contract (protocol only)
+
+The immediate CC-02-V prerequisite is now operationalized in the Arena-only [private visible-arc / target-arc annotation, blind adjudication and P/G/R stage-control protocol](CC02_PRIVATE_ANNOTATION_PROTOCOL.md). This document specifies **how to check** the provisional 3/2/1 mirror classification without deriving labels from predicted paths, and when synthetic labels cannot be assumed for natural artwork. Annotation collection, full-checkout runs and newly demonstrated P/G/R capabilities have **NOT occurred**. This is a DOCUMENTATION change, not a model improvement.
