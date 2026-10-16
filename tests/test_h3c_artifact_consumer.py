@@ -9,7 +9,6 @@ from adapters.imageprogram_reference.consume_h3c import (
     validate_public_bundle,
 )
 
-
 SOURCE_COMMIT = "824cbefc14e3e1e4978f10fd687a0c80fb200f4d"
 
 

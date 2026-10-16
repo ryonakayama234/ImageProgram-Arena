@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from adapters.imageprogram_reference.h5_branch_isolation import (
-    BranchIsolationError,
     REPORT_FORMAT,
+    BranchIsolationError,
     candidate_manifest_hash,
     run_exhaustive_branches,
 )

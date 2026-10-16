@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 
 from adapters.imageprogram_reference.source_artwork import (
-    SourceIntakeError, ingest_local_source,
+    SourceIntakeError,
+    ingest_local_source,
 )
 
 try:
