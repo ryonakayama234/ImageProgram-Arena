@@ -71,6 +71,20 @@ class ObservedG1Tests(unittest.TestCase):
         self.assertEqual(row["abstain_negative"], 2)
         self.assertNotIn("TN", row)
 
+    def test_forbidden_hypothesis_and_missed_positive_are_both_counted(self):
+        changed = copy.deepcopy(self.prediction)
+        truths = {(p["src"], p["dst"]): p["truth"] for p in self.labels["rows"][15]["pairs"]}
+        negative_changed = False
+        for edge in changed["rows"][15]["g1"]:
+            truth = truths[edge["src"], edge["dst"]]
+            if truth == "positive":
+                edge["kind"] = "adjacent_distinct"
+            elif not negative_changed:
+                edge["kind"] = "possible_continuation"
+                negative_changed = True
+        counts = self.grade(prediction=changed)["reviews"][15]["counts"]["g1"]
+        self.assertEqual(counts, {"FN": 1, "FP": 1, "TN": 1})
+
     def test_grade_does_not_call_relation_models_or_observer(self):
         from imageprogram.models import (
             branch_contour_p02,
