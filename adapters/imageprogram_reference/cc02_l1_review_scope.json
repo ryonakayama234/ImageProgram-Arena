@@ -1,0 +1,31 @@
+{
+  "protocol": "cc02-blind-l0-l1-review-v1",
+  "observation_sha256": "01d4cb52b2cc62f86c06730b9bc00982e03209ad14b2c7b519f0d1d1796b0af0",
+  "source_heads": {
+    "arena": "7a7c26815472ae2bc866415f04c5d9888f0d4021",
+    "model": "531d78d365b4c7882a3898a3e11fda3e809b4857"
+  },
+  "tasks": [
+    {
+      "task_id": "obs-02",
+      "fragment_sha256": "6d2f384b93fe0568d077bf6cf86ad3ef4d0462a511748a17734",
+      "pairs": [["n000", "n001"], ["n000", "n002"], ["n001", "n002"]]
+    },
+    {
+      "task_id": "obs-10",
+      "fragment_sha256": "37fa2cf546f72b4eac3498e3432ec73c5272fb3781dadc8d609f3e",
+      "pairs": [["n000", "n001"], ["n000", "n002"], ["n000", "n003"], ["n001", "n002"], ["n001", "n003"], ["n002", "n003"]]
+    },
+    {
+      "task_id": "obs-11",
+      "fragment_sha256": "140d0f36279bda4a6607eb6552daf24fcfc4cea22523f53e4c704aea2c088724",
+      "pairs": [["n000", "n001"]]
+    }
+  ],
+  "provenance": {
+    "split": "prior-synthetic-DEV-only; NO original confirmation",
+    "selection": "All 10 UNKNOWN pairs in the 2026-10-16 observed-P02 study, no accuracy or G-output selection",
+    "origin": "ImageProgram-Arena docs/evidence/cc02-g1-python312-observed-p02-20261016.json",
+    "ground_truth": "NONE; human reviewers have not evaluated these pixels"
+  }
+}
