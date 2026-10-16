@@ -1,3 +1,5 @@
+> **Latest (2026-10-16): full Python3.12 G1 validation and actual P02-observed Fragment evaluation executed. Model301, final Arena176, runner6, both full Ruff PASS. G0/G1 both TP7/TN20/FP0/FN0; UNKNOWN10; no observed improvement.** [Current System/ER/results/limits](CC02_G1_PYTHON312_OBSERVED_P02_20261016.md). Earlier NOT_RUN statements below describe the prior compatible-stub milestone, retained as history.
+
 # Arena CC-02-G1 — DEV-only fixed public Fragment comparator (2026-10-16)
 
 **Status: research-only source-author synthetic geometry bank and separate PREDICT/GRADE implementation. Actual current controlled evidence: local smoke on Python 3.13.5 with CC01-compatible stub. Authoritative full Python 3.12 whole-repository run NOT RUN.**

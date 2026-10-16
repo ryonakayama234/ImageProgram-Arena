@@ -1,3 +1,7 @@
+## Latest G1 / actual P02 observation — 2026-10-16
+
+[Python3.12 complete validation, fixed actual observations, independent source-stroke grade, System/ER/results/negative evidence](CC02_G1_PYTHON312_OBSERVED_P02_20261016.md). Model301/Arena176/runner6, full Ruff/doctor PASS. G0=G1 TP7/TN20/FP0/FN0, UNKNOWN10; improvement NOT_DEMONSTRATED. #99 blind annotation, R path, drawing, confirmation and merge remain open/deferred.
+
 ## Latest P02 execution — 2026-10-16
 
 [W0 full Python3.12 validation / System / ER / fresh anchored PREDICT-GRADE / failures / Decision](CC02_P02_W0_EXECUTED_20261016.md). Model293/293, complete Arena165/165 (current161+historical4), runner6/6 and both full Ruff PASS. All27 source-derived grades retained, including two budget abstentions; no semantic/path/drawing capability claim. W0 is complete; #99 independent blind annotation stays OPEN, confirmation unscored, Draft/unmerged.
