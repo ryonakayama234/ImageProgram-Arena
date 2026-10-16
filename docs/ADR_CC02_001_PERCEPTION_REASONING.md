@@ -1,3 +1,5 @@
+> **Limited amendment, 2026-10-16 user-authorized CC-02-P01:** source-derived synthetic pixel-retention testing may proceed while #99 independent semantic annotation remains OPEN. No weak-to-G/R promotion, semantic ownership claim, confirmation or real-art ability is authorized by this exception. See [scope, System/ER, fixed protocol and executed evidence](CC02_P01_WEAK_EVIDENCE.md). All other gates below remain in force.
+
 # ADR-CC02-001 — Arenaの独立診断をP(知覚)・G(関係仮説)・R(推論)に分離
 **Date:** 2026-10-15 JST
 **Status:** ACCEPTED RESEARCH DIRECTION; implementation pending / confirmation NOT SCORED
