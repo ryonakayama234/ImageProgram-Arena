@@ -39,6 +39,17 @@ class W0RunnerContract(unittest.TestCase):
             self.assertFalse(test["passed"])
             self.assertEqual(len(test["log_sha256"]), 64)
 
+    def test_grade_requires_external_anchor_before_preflight(self):
+        import sys
+
+        argv = ["w0", "--phase", "grade", "--model", "/model", "--arena", "/arena",
+                "--historical-model", "/historic", "--expected-model-head", "0" * 40,
+                "--expected-arena-head", "1" * 40, "--out", "/tmp/out",
+                "--receipt", "/tmp/saved_prediction.json"]
+        with patch.object(sys, "argv", argv):
+            with self.assertRaisesRegex(ValueError, "external-64hex"):
+                r.main()
+
     def test_no_confirmation_import(self):
         source = Path(r.__file__).read_text()
         self.assertNotIn("create_confirmation_pair", source)
