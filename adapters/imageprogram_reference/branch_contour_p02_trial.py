@@ -77,7 +77,14 @@ def _public_cases():
 def predict():
     from imageprogram.models.branch_contour_p02 import observe_branch
     from imageprogram.models.contextual_contour_cc01 import observe_graph, select
+    from imageprogram.models import contextual_contour_cc01 as baseline_module
+    from imageprogram.models import branch_contour_p02 as branch_module
 
+    source_hashes = {
+        "p02_model": hashlib.sha256(Path(branch_module.__file__).read_bytes()).hexdigest(),
+        "frozen_p0": hashlib.sha256(Path(baseline_module.__file__).read_bytes()).hexdigest(),
+        "arena_trial": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
     rows = []
     for family, case_id, public in _public_cases():
         image, focus = public["pixels_l8"], public["focus_box"]
@@ -98,7 +105,10 @@ def predict():
                      "evidence_sha256": out.evidence_sha256,
                      "arms": [asdict(a) for a in out.arm_candidates]})
     return {"version": VERSION, "split": "development-and-technical-only",
-            "confirmation": "NOT_RUN", "rows": rows}
+            "confirmation": "NOT_RUN", "source_sha256": source_hashes,
+            "model_budget": {"threshold": 200, "junction_pixels": 8,
+                             "arm_candidates": 16, "pixel_pass_equivalents": 16384},
+            "rows": rows}
 
 
 def _source_masks(family, case_id, public):
