@@ -101,3 +101,10 @@ Output directories and reconciliation file use exclusive creation; do not overwr
 **SELECT** annotate the existing ten unknown relations before any threshold tuning; **REJECT** interpreting G1 7/7 as end-to-end drawing skill or treating undecidable junction pixels as positive/negative by default; **DEFER** curved/slanted new family experiment until its generation/source-family split and label contract are independently preregistered, then P0+P02 duplicate-aware adapter and R0/R1 ordered-path comparison on the same frozen graph.
 
 Parent [#99](https://github.com/ryonakayama234/ImageProgram/issues/99) / [#101](https://github.com/ryonakayama234/ImageProgram/issues/101), ADR-CC02-001. Original confirmation six pairs remain sealed and unscored; keep both new PRs Draft/unmerged.
+
+
+### Additional local renderer smoke (separate from the eight contract tests)
+
+A locally stubbed **27-public-raster** feed with matching synthetic digest was exercised against the exact locally tested code. It emitted nine outputs (three raw PNGs, three geometrical overlays, frozen packet.json and two reviewer response templates), and the hash checks passed. This is **not** the historical source-exact observation renderer: the original saved observation.json is not present in this turn. No person judged any image, and the raw/overlay pixels were generated from a synthetic mock, not the P02 historical pixel bank. The original and new G algorithm were not called.
+
+[Machine-readable local evidence and code blob hashes](https://github.com/ryonakayama234/ImageProgram-Arena/blob/research/cc02-l1-blind-annotation-gate/docs/evidence/cc02-l1-blind-review-local-smoke-20261016.json). The runner additionally requires the previously externally published canonical packet SHA during reconcile, preventing a replacement packet being accepted just because submitted reviewer responses match each other.
