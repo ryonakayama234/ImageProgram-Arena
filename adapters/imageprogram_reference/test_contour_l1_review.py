@@ -2,6 +2,7 @@
 import copy
 import importlib.util
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -83,6 +84,15 @@ class BlindL1Tests(unittest.TestCase):
         self.assertEqual(r["counts"], {"DISPUTED": 1, "CONSENSUS": 9})
         a["l0"][next(iter(a["l0"]))] = "uncertain"
         self.assertGreater(blind.combine(p, a, b)["counts"]["UNRESOLVED_L0"], 0)
+
+    def test_published_packet_digest_fail_closed(self):
+        p = self.packet()
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "packet.json"
+            blind.write_new(path, p)
+            self.assertEqual(blind.load_verified(path, blind.digest(p)), p)
+            with self.assertRaisesRegex(ValueError, "altered-anchored-artifact"):
+                blind.load_verified(path, "0" * 64)
 
     def test_review_pair_universe_and_reviewer_uniqueness(self):
         p = self.packet()
