@@ -144,6 +144,10 @@ def _sha_json(value):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _file_sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+
+
 def _review_dev(private, arc, trace, receipt, public):
     """Private grading AFTER receipts are fully recorded and hashed."""
     if arc.member_id != private.member_id:
@@ -236,6 +240,13 @@ def run_development_audit():
         raise RuntimeError("refuse-non-frozen-model")
     from adapters.imageprogram_reference import contextual_contour_cc02_pilot as pilot
 
+    model_root = Path(imageprogram.__file__).resolve().parents[2]
+    arena_root = Path(pilot.__file__).resolve().parents[2]
+    model_sha = _git_sha(model_root)
+    arena_sha = _git_sha(arena_root)
+    if "unknown" in (model_sha, arena_sha):
+        raise RuntimeError("paired-git-checkout-sha-required")
+
     pairs = [create_development_pair(i) for i in range(6)]
     manifests = [validate_pair(pair) for pair in pairs]
     manifest_hash = _manifest(manifests)
@@ -316,10 +327,22 @@ def run_development_audit():
         "cpu_elapsed_ns": time.process_time_ns() - start_cpu_ns,
         "trace_version": "cc02-v-public-trace-v1",
         "arena_version": VERSION,
-        "model_sha": _git_sha(Path(imageprogram.__file__).resolve().parents[2]),
-        "arena_sha": _git_sha(Path(pilot.__file__).resolve().parents[2]),
+        "model_sha": model_sha,
+        "arena_sha": arena_sha,
         "development_manifest_sha256": manifest_hash,
         "config": FROZEN_CONFIG,
+        "config_sha256": _sha_json(FROZEN_CONFIG),
+        "source_file_sha256": {
+            "model_observer": _file_sha(
+                model_root / "src/imageprogram/models/contextual_contour_cc01.py"),
+            "model_public_trace": _file_sha(
+                model_root / "src/imageprogram/models/contextual_contour_cc02_trace.py"),
+            "model_uv_lock": _file_sha(model_root / "uv.lock"),
+            "model_pyproject": _file_sha(model_root / "pyproject.toml"),
+            "arena_generator": _file_sha(
+                arena_root / "adapters/imageprogram_reference/contextual_contour_cc02_tasks.py"),
+            "arena_auditor": _file_sha(Path(__file__)),
+        },
         "zero_tolerance_synthetic_support": True,
         "pregrade_receipts_sha256": receipts_sha,
         "pregrade_receipts": pregrade_receipts,
