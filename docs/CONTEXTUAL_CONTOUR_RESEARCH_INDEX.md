@@ -1,4 +1,6 @@
 # Contextual Contour — Arena decision / evaluation index
+
+**2026-10-16 current CC-02-V:** [review, corrected contracts, experiment and research backlog](CC02_V_REVIEW_20261016.md). This entry supersedes older CC-02-V execution-status statements below; #99 independent annotation remains open.
 Reviewed 2026-10-15 JST. Keys: H-ContextualContour-01, ADR-CC02-001, CC-02-V, CC-02-P, CC-02-R, Oracle-P, Oracle-R, drawing-deferred.
 
 **ACTIVE EVALUATION DIRECTION:** [ADR-CC02-001 — 分離した知覚/関係/推論評価](ADR_CC02_001_PERCEPTION_REASONING.md); paired [Model ADR](https://github.com/ryonakayama234/ImageProgram/blob/research/contextual-contour-cc02/docs/ADR_CC02_001_PERCEPTION_REASONING.md).
