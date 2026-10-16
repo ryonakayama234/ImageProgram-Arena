@@ -257,7 +257,25 @@ def run_development_audit():
     ]
     receipts_sha = _sha_json(pregrade_receipts)
 
-    # Phase two: Arena-private sidecars are now allowed.
+    # Phase two: Arena-private sidecars are now allowed. Detect any
+    # indistinguishable full public input with contradictory hidden labels.
+    collision_labels = {}
+    for _, public, private, _, _ in pending:
+        public_identity = (
+            public["format"], public["raster_digest"], public["focus_box"],
+            public["anchor_px"], public["budget_pixels"],
+        )
+        collision_labels.setdefault(public_identity, set()).add(private.expected_action)
+    for public, private, _, _ in controls:
+        public_identity = (
+            public["format"], public["raster_digest"], public["focus_box"],
+            public["anchor_px"], public["budget_pixels"],
+        )
+        collision_labels.setdefault(public_identity, set()).add(private.expected_action)
+    unidentifiable = sum(len(labels) > 1 for labels in collision_labels.values())
+    if unidentifiable:
+        raise RuntimeError("unidentifiable-contradictory-public-inputs")
+
     graded = [
         _review_dev(private, development_private_arc(i, private), trace, receipt, public)
         for i, public, private, trace, receipt in pending
@@ -272,13 +290,21 @@ def run_development_audit():
                     "correct": d["action"] == private.expected_action,
                 })
     by_arm = {}
-    for arm in ("A1", "B", "B-shuffle"):
-        decisions = [row["reviews"][k] for row in graded for k in range(3)
-                     if row["reviews"][k]["arm"] == arm]
+    for arm_idx, arm in enumerate(("A1", "B", "B-shuffle")):
+        decisions = [row["reviews"][arm_idx] for row in graded]
         by_arm[arm] = {
             "correct_members": sum(d["correct"] for d in decisions),
             "members": len(decisions),
+            "both_correct_pairs": sum(
+                all(graded[2 * i + j]["reviews"][arm_idx]["correct"] for j in range(2))
+                for i in range(6)
+            ),
+            "pairs": 6,
             "holds": sum(d["action"] == "hold" for d in decisions),
+            "false_continues": sum(
+                d["action"] == "continue" and d["expected"] == "stop"
+                for d in decisions
+            ),
         }
     b_continue = [r for r in graded if r["member_id"].endswith("-continue")]
     return {
@@ -309,6 +335,7 @@ def run_development_audit():
             },
         },
         "annotation_scope": "synthetic-program-derived, single author; NO real-art adjudication",
+        "unidentifiable_public_input_count": unidentifiable,
         "confirmation": "NOT SCORED",
         "real_art": "NOT RUN",
         "canvas": "NOT RUN",
