@@ -1,3 +1,5 @@
+> **追記（2026-10-16）**：当時の `observation.json` が手元にない場合の手順を追加しました。元ソースの固定SHAで27画像を再観測し、GitHubに残る全27件のFragment/status/対数を照合してから、**別の新規SHAを持つ再生成物**としてレビュー画像を作れます。旧観測SHAそのものを再現したとは主張しません。実行手順・System/ER/失敗条件は [Arena再生成プロトコル](https://github.com/ryonakayama234/ImageProgram-Arena/blob/research/cc02-l1-blind-annotation-gate/docs/CC02_L1_OBSERVATION_REBUILD_20261016.md)。再生成の局所テスト9/9 PASS、完全Python3.12検証と実画像パケット生成は未実施。以下の「元JSON必須」は、この追記前の方式についての記録です。
+
 # CC-02-L0/L1 blind review gate — 2026-10-16, Draft
 
 **Decision: SELECT an annotation-first diagnostic. IMPLEMENTED infrastructure / NOT YET EXECUTED human annotation. No G1 performance promotion.**
