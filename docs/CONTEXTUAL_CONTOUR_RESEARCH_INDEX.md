@@ -1,3 +1,7 @@
+## CC-02-P01 technical experiment — 2026-10-16
+
+[Weak observed ink: System/ER, limited gate amendment, fixed conditions, all29 results, side effects and decision](CC02_P01_WEAK_EVIDENCE.md). Candidate coverage3/6->4/6; weak distractors retained; contextual ability and original5/6 gate not met. #99 annotation and #100 remain OPEN.
+
 ## Latest execution — 2026-10-16
 
 [V2 actual source-derived reproduction / System / ER / initial failures / all results / next gate](CC02_V2_EXECUTION_20261016.md). 3P/2G/1action reproduced, not new ability. #99 independent annotation still OPEN; confirmation untouched.
