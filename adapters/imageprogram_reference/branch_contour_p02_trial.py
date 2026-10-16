@@ -142,6 +142,11 @@ def grade(receipt, anchored_sha):
     actual = hashlib.sha256(raw.encode()).hexdigest()
     if actual != anchored_sha:
         raise ValueError("unanchored-or-altered-prediction")
+    if receipt.get("version") != VERSION:
+        raise ValueError("version-mismatch")
+    source = receipt.get("source_sha256", {})
+    if source.get("arena_trial") != hashlib.sha256(Path(__file__).read_bytes()).hexdigest():
+        raise ValueError("arena-source-drift")
     rows = list(_public_cases())
     if (len(rows) != len(receipt["rows"])
             or receipt.get("confirmation") != "NOT_RUN"
