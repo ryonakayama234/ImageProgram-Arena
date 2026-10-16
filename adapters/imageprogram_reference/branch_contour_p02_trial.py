@@ -22,26 +22,26 @@ from adapters.imageprogram_reference.contextual_contour_cc02_tasks import (
 VERSION = "arena-branch-p02-screen-v0"
 FOCUS = (6, 12, 55, 59)
 # Fixed before authoritative checkout trial: 12 synthetic technical challenges.
-# name, source ink strokes, target stroke index, excluded stroke index
+# Public geometry only: name and observed source strokes. Private indices live in grade-only module.
 CASES = (
-    ("t-right", (((16, 30), (43, 30)), ((30, 30), (30, 44))), 0, 1),
-    ("t-left", (((16, 34), (43, 34)), ((30, 20), (30, 34))), 0, 1),
+    ("t-right", (((16, 30), (43, 30)), ((30, 30), (30, 44)))),
+    ("t-left", (((16, 34), (43, 34)), ((30, 20), (30, 34)))),
     ("y-up", (((16, 35), (30, 35)), ((30, 35), (44, 21)),
-              ((30, 35), (44, 49))), 1, 2),
+              ((30, 35), (44, 49)))),
     ("y-down", (((16, 32), (30, 32)), ((30, 32), (45, 19)),
-                ((30, 32), (45, 45))), 2, 1),
-    ("x-one", (((16, 16), (45, 45)), ((16, 45), (45, 16))), 0, 1),
-    ("x-two", (((16, 42), (46, 22)), ((18, 22), (46, 43))), 1, 0),
-    ("parallel", (((16, 28), (47, 28)), ((16, 35), (47, 35))), 0, 1),
-    ("near-miss", (((16, 32), (30, 32)), ((33, 34), (46, 34))), 0, 1),
-    ("corner", (((16, 32), (30, 32)), ((30, 32), (43, 42))), 1, None),
+                ((30, 32), (45, 45)))),
+    ("x-one", (((16, 16), (45, 45)), ((16, 45), (45, 16)))),
+    ("x-two", (((16, 42), (46, 22)), ((18, 22), (46, 43)))),
+    ("parallel", (((16, 28), (47, 28)), ((16, 35), (47, 35)))),
+    ("near-miss", (((16, 32), (30, 32)), ((33, 34), (46, 34)))),
+    ("corner", (((16, 32), (30, 32)), ((30, 32), (43, 42)))),
     ("thick-t", (((17, 32), (46, 32)), ((30, 32), (30, 49)),
-                 ((17, 33), (46, 33)), ((31, 32), (31, 49))), 0, 1),
+                 ((17, 33), (46, 33)), ((31, 32), (31, 49)))),
     ("t-distractor", (((16, 30), (44, 30)), ((31, 30), (31, 44)),
-                       ((55, 48), (67, 48))), 0, 2),
+                       ((55, 48), (67, 48)))),
     ("junction-grid", (((17, 22), (50, 22)), ((17, 30), (50, 30)),
                        ((17, 38), (50, 38)), ((25, 17), (25, 46)),
-                       ((41, 17), (41, 46))), 0, 2),
+                       ((41, 17), (41, 46)))),
 )
 
 
@@ -53,7 +53,7 @@ def _stroke(a, b):
 
 
 def _technical_public(index):
-    name, strokes, _, _ = CASES[index]
+    name, strokes = CASES[index]
     image = np.full((72, 72), 255, dtype=np.uint8)
     for a, b in strokes:
         for x, y in _stroke(a, b):
@@ -116,7 +116,7 @@ def _source_masks(family, case_id, public):
     if family == "technical":
         index = next(i for i, c in enumerate(CASES)
                      if case_id.startswith(c[0] + ":"))
-        _, strokes, chosen, excluded = CASES[index]
+        from adapters.imageprogram_reference.branch_contour_p02_private import (\n            SOURCE_STROKE_INDICES,\n        )\n        _, strokes = CASES[index]\n        chosen, excluded = SOURCE_STROKE_INDICES[index]
         target = _stroke(*strokes[chosen]) if chosen is not None else set()
         other = _stroke(*strokes[excluded]) if excluded is not None else set()
         # Shared observed junction ink is not forbidden-exclusive ink.
