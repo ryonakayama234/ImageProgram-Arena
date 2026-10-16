@@ -64,6 +64,9 @@ def main():
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--worker", choices=("current", "legacy"))
     args = parser.parse_args()
+    # Worker cwd is Arena, while callers may launch the controller elsewhere.
+    # Resolve before sending paths across that process boundary.
+    args.out = args.out.resolve()
     if args.worker:
         model_root, model_sha = model_identity()
         if args.worker == "legacy" and model_sha != LEGACY_SHA:
