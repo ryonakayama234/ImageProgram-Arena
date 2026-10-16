@@ -126,7 +126,9 @@ def run_validation(model: Path, arena: Path, historical: Path, out: Path) -> lis
                                                str(model / "pyproject.toml"),
              "adapters/imageprogram_reference/branch_contour_p02_trial.py",
              "adapters/imageprogram_reference/branch_contour_p02_private.py",
-             "tests/test_branch_contour_p02_trial.py"], arena, out),
+             "tests/test_branch_contour_p02_trial.py",
+             "scripts/cc02_p02_w0_runner.py", "scripts/test_cc02_p02_w0_runner.py"],
+                arena, out),
     ]
 
 
