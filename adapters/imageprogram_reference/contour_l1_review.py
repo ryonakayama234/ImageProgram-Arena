@@ -196,6 +196,7 @@ def main():
     parser.add_argument("--observation-sha256")
     parser.add_argument("--scope", type=Path)
     parser.add_argument("--packet", type=Path)
+    parser.add_argument("--packet-sha256")
     parser.add_argument("--review-a", type=Path)
     parser.add_argument("--review-b", type=Path)
     parser.add_argument("--out", required=True, type=Path)
@@ -203,7 +204,7 @@ def main():
     if args.phase == "prepare":
         if not args.observation or not args.observation_sha256 or not args.scope:
             parser.error("prepare-requires-observation-sha-and-frozen-scope")
-        if any((args.packet, args.review_a, args.review_b)):
+        if any((args.packet, args.packet_sha256, args.review_a, args.review_b)):
             parser.error("prepare-rejects-reviewer-inputs")
         obs = load_verified(args.observation, args.observation_sha256)
         scope = json.loads(args.scope.read_text(encoding="utf-8"))
@@ -211,11 +212,11 @@ def main():
             parser.error("external-scope-hash-mismatch")
         print("BLIND_PACKET_SHA256", prepare_artifacts(obs, scope, args.out))
     else:
-        if not all((args.packet, args.review_a, args.review_b)):
-            parser.error("reconcile-requires-packet-and-two-reviewers")
+        if not all((args.packet, args.packet_sha256, args.review_a, args.review_b)):
+            parser.error("reconcile-requires-anchored-packet-and-two-reviewers")
         if any((args.observation, args.observation_sha256, args.scope)):
             parser.error("reconcile-rejects-observation-private-inputs")
-        data = combine(json.loads(args.packet.read_text(encoding="utf-8")),
+        data = combine(load_verified(args.packet, args.packet_sha256),
                        json.loads(args.review_a.read_text(encoding="utf-8")),
                        json.loads(args.review_b.read_text(encoding="utf-8")))
         write_new(args.out, data)
