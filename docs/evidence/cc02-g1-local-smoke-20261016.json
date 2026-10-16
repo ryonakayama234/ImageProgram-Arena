@@ -1,0 +1,71 @@
+{
+  "protocol": "cc02-g1-fixed-fragments-local-smoke-v0",
+  "date_jst": "2026-10-16",
+  "claim": "LOCAL COMPATIBLE-CC01 STUB ONLY; NOT AUTHENTIC SOURCE-EXACT P0/P02 EXPERIMENT",
+  "w0_predecessor": {
+    "status": "PASS ON EARLIER HEADS ONLY",
+    "model_commit": "76164a4ecbfa07b074d105aadae09dd7f567b69a",
+    "arena_commit": "1143a69306c64a5a6f9bbe0d5d7b6e56db1d47fe"
+  },
+  "run_environment": {
+    "python": "3.13.5",
+    "numpy": "2.3.5",
+    "cc01_baseline": "local-compatible-stub, NOT original full source",
+    "full_model_and_arena_tests": "NOT_RUN",
+    "full_ruff": "NOT_RUN"
+  },
+  "new_exact_source_github_git_blobs": {
+    "model_g1": "196705a5cf7e7c927b55b3446b386dc862f83772",
+    "model_g1_tests": "7e41bfd2e3564adb81ddbec73faf22b2388867eb",
+    "arena_g1_public_tasks": "3d5606e99487ec5d149ed78b16246833f9fded26",
+    "arena_g1_private_grade": "0df1245f787f72201b702e609efce4795e2fbdad",
+    "arena_g1_trial": "db7e81109469fbc5aed7be3fccfff2245b691295",
+    "arena_g1_tests": "6835c5bfd8ea7a0c6ae188b11deb511e3731f631"
+  },
+  "verification": {
+    "model_isolated_tests": {
+      "passed": 8,
+      "failed": 0
+    },
+    "arena_trial_tests": {
+      "passed": 3,
+      "failed": 0
+    },
+    "python_compile": "PASS",
+    "separate_grade_process": "PASS",
+    "grade_calculated_from_saved_prediction": true
+  },
+  "inputs": {
+    "public_scene_count": 8,
+    "source_author_edge_pairs_scored": 6,
+    "unknown_pair_count": 3,
+    "public_scene_ids": "gdev-00..07 neutral, no polarity information",
+    "input_type": "direct-injected synthetic Fragment tuples, not observed raster"
+  },
+  "receipt": {
+    "canonical_prediction_sha256": "f46ee84a3a8c647a8267bc9567161cf468b4189a5156f4feb14193305436dbd4",
+    "prediction_pretty_file_sha256": "412226e608964d5fb340684955ff29e96c11ebff74f6312b92a07a3722d016ea",
+    "external_pre_grade_anchor": "https://github.com/ryonakayama234/ImageProgram/issues/101#issuecomment-6215953589",
+    "grade_pretty_file_sha256": "1a6acf4f53a2f9e9a9f49781fa1d6680058579a515293dca459769d2fedb54be"
+  },
+  "grade_source_author_dev": {
+    "g0_correct": 4,
+    "g1_correct": 6,
+    "denominator": 6,
+    "g1_false_continuations_on_three_scored_negatives": 0,
+    "unscored_unknown_pairs": 3,
+    "g1_continuation_hypotheses_on_competing_unknown_branches": 2,
+    "shared_endpoint_ambiguity": 1
+  },
+  "scope": {
+    "independent_blind_annotation": "NOT_RUN",
+    "source_exact_full_python_3_12": "NOT_RUN",
+    "real_p0_p02_fragments": "NOT_RUN",
+    "original_cc02_confirmation": "NOT_RUN",
+    "selected_ordered_path": "NOT_RUN",
+    "motor_canvas_replay": "NOT_RUN",
+    "skill_learning": "NOT_RUN",
+    "merge": "NOT_RUN",
+    "paid_ci": "NOT_RUN"
+  }
+}
