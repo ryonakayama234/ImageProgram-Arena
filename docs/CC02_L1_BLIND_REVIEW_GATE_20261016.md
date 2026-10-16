@@ -53,7 +53,7 @@ On the new Arena research-only branch, add:
 - \`adapters/imageprogram_reference/cc02_l1_review_scope.json\`: exact 3 task/10 pair mapping and frozen prior source SHA/Fragment SHAs.
 - \`adapters/imageprogram_reference/test_contour_l1_review.py\`: 7 strict standalone tests including hash mutations, missing pair, label injection, duplicate reviewer identity, actual disagreement, PENDING behavior and no G/source-label content.
 
-**Verified this turn:** standalone Python 3.13.5 \`unittest\` **7/7 PASS**; \`py_compile\` PASS. Three files' exact Git blob SHA match local tested bytes. **NOT VERIFIED this turn:** full locked Python3.12 Model/Arena suites/Ruff for the new branch; real old observation JSON replay; actual PNG generation on the authentic restored source trees; two human reviews; L0/L1 consensus; any G0/G1 delta; real artwork; R paths; original confirmation; merge/paid CI.
+**Verified this turn:** standalone Python 3.13.5 \`unittest\` **8/8 PASS**; \`py_compile\` PASS. Three files' exact Git blob SHA match local tested bytes. **NOT VERIFIED this turn:** full locked Python3.12 Model/Arena suites/Ruff for the new branch; real old observation JSON replay; actual PNG generation on the authentic restored source trees; two human reviews; L0/L1 consensus; any G0/G1 delta; real artwork; R paths; original confirmation; merge/paid CI.
 
 ## How to execute from the original saved observation
 
@@ -78,6 +78,7 @@ $MODEL_PY -m adapters.imageprogram_reference.contour_l1_review \
 $MODEL_PY -m adapters.imageprogram_reference.contour_l1_review \
   --phase reconcile \
   --packet /tmp/cc02-l1-review-new/packet.json \
+  --packet-sha256 PUBLISHED_PACKET_SHA256 \
   --review-a /path/to/completed-reviewer-A.json \
   --review-b /path/to/completed-reviewer-B.json \
   --out /tmp/cc02-l1-review-reconciliation-new.json
