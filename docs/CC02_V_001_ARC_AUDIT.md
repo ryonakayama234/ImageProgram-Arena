@@ -1,5 +1,7 @@
 # CC-02-V-001 — Arena-private development arc audit
 
+> Superseded for current status, schema v2, commands and review corrections by [CC-02-V review 2026-10-16](CC02_V_REVIEW_20261016.md). The v1 text below is historical, including its then-NOT-RUN state.
+
 **2026-10-16 JST · status: IMPLEMENTED, NEVER SCORED confirmation; FULL CHECKOUT EXECUTION PENDING**
 
 Research [Model Issue #99](https://github.com/ryonakayama234/ImageProgram/issues/99) · [Arena ADR-CC02-001](ADR_CC02_001_PERCEPTION_REASONING.md) · [Model tracing companion](https://github.com/ryonakayama234/ImageProgram/blob/research/cc02-v-diagnostics/docs/CC02_V_001_PUBLIC_TRACE.md).

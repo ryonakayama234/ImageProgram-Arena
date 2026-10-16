@@ -13,9 +13,11 @@ import argparse
 import hashlib
 import json
 import platform
+import subprocess
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 from adapters.imageprogram_reference.contextual_contour_cc02_pilot import _git_sha, _manifest
 from adapters.imageprogram_reference.contextual_contour_cc02_tasks import (
@@ -24,7 +26,7 @@ from adapters.imageprogram_reference.contextual_contour_cc02_tasks import (
     validate_pair,
 )
 
-VERSION = "arena-cc02-v-arc-audit-v1"
+VERSION = "arena-cc02-v-arc-audit-v2"
 DEVELOPMENT_MANIFEST_SHA256 = "4d796ebc0467153a119a233724e6f9cfc1b8509b65c77bd101c31da3a3d61dcd"
 # Zero-tolerance exact synthetic raster support: no interpolated approximate
 # bounding boxes or post-hoc precision tuning.
@@ -51,8 +53,8 @@ def _line(a, b):
     x1, y1 = b
     steps = max(abs(x1 - x0), abs(y1 - y0))
     return tuple((
-        int(round(x0 + j * (x1 - x0) / max(steps, 1))),
-        int(round(y0 + j * (y1 - y0) / max(steps, 1))),
+        round(x0 + j * (x1 - x0) / max(steps, 1)),
+        round(y0 + j * (y1 - y0) / max(steps, 1)),
     ) for j in range(steps + 1))
 
 
@@ -111,8 +113,8 @@ def development_private_arc(index, private):
 def _public_observe(public):
     from imageprogram.models.contextual_contour_cc01 import select
     from imageprogram.models.contextual_contour_cc02_trace import (
-        observe_with_evidence,
         evidence_digest,
+        observe_with_evidence,
     )
 
     trace = observe_with_evidence(
@@ -130,6 +132,8 @@ def _public_observe(public):
             raise RuntimeError("candidate-set-sha-mismatch")
         snapshots.append(asdict(decision))
     return trace, {
+        "public_input": _public_identity(public),
+        "trace": asdict(trace),
         "raster_sha256": public["raster_digest"],
         "graph_sha256": trace.graph.candidate_set_sha256,
         "trace_sha256": evidence_digest(trace),
@@ -172,25 +176,29 @@ def _review_dev(private, arc, trace, receipt, public):
     target_ids = {
         c.admitted_node_id for c in selected_components if target.intersection(c.pixels_xy)
     }
-    local_nodes = [n for n in trace.graph.nodes if n.region == "focus"]
-    # The right-hand focus component is the publicly observed bridge-neighbor,
-    # not chosen via any private target identity.
-    neighbor = max(
-        local_nodes, key=lambda n: max(n.endpoint_a[0], n.endpoint_b[0]),
-        default=None,
-    )
+    # An admitted component can contain both target and an excluded branch.
+    # Shared junction pixels are allowed; branch-exclusive pixels are not.
+    excluded_only = set(arc.excluded_xy) - target
+    target_components = [c for c in selected_components if c.admitted_node_id in target_ids]
+    target_support = {xy for c in target_components for xy in c.pixels_xy}
+    contamination = len(target_support & excluded_only)
     edge_accessible = False
+    b_decision = next(d for d in receipt["decisions"] if d["arm"] == "B")
+    selected_ids = b_decision["selected_nodes"]
+    nodes = {n.node_id: n for n in trace.graph.nodes}
+    # Use the selector's actual local pair, never the rightmost focus object.
+    neighbor_id = selected_ids[1] if len(selected_ids) == 2 else None
+    local_pair_known = (neighbor_id in nodes and
+                        all(n in nodes and nodes[n].region == "focus" for n in selected_ids))
     forbidden_edge_count = 0
-    if neighbor is not None:
+    if local_pair_known:
         for e in trace.graph.edges:
-            if (e.kind == "possible_continuation" and
-                    {e.src, e.dst} & target_ids and
-                    neighbor.node_id in (e.src, e.dst)):
+            if e.kind != "possible_continuation" or neighbor_id not in (e.src, e.dst):
+                continue
+            other = e.dst if e.src == neighbor_id else e.src
+            if other in target_ids and nodes[other].region == "context":
                 edge_accessible = True
-            if (e.kind == "possible_continuation" and
-                    neighbor.node_id in (e.src, e.dst) and not target and
-                    any(n.node_id in (e.src, e.dst) and n.region == "context"
-                        for n in trace.graph.nodes)):
+            if not target and other in nodes and nodes[other].region == "context":
                 forbidden_edge_count += 1
 
     reviews = []
@@ -201,16 +209,22 @@ def _review_dev(private, arc, trace, receipt, public):
             stage = "correct" if correct else "false-continue-or-hold"
         elif (coverage is None or coverage < MIN_CANDIDATE_COVERAGE):
             stage = "P-evidence-not-admitted"
+        elif contamination:
+            stage = "target-ownership-unresolved"
+        elif not local_pair_known:
+            stage = "local-selection-unresolved"
         elif not edge_accessible:
             stage = "G-correct-relation-absent"
         elif not correct:
             stage = "R-selection-or-unobserved-path"
         else:
-            stage = "correct"
+            stage = "action-correct-path-unverified"
         reviews.append({
             "arm": decision["arm"], "action": action,
             "expected": private.expected_action, "correct": correct,
-            "earliest_blocker": stage,
+            # Stage attribution is defined for the full-context B arm only.
+            "earliest_blocker": stage if decision["arm"] == "B" else "NOT_ATTRIBUTED",
+            "selected_path_verdict": "UNKNOWN",
         })
     return {
         "member_id": private.member_id,
@@ -221,170 +235,242 @@ def _review_dev(private, arc, trace, receipt, public):
         "threshold_survival": threshold_fraction,
         "admitted_target_coverage": coverage,
         "admitted_target_node_ids": sorted(target_ids),
-        "target_edge_accessible": edge_accessible if target else None,
+        "target_edge_accessible": edge_accessible if target and local_pair_known else None,
+        "b_local_pair_known": bool(local_pair_known),
+        "target_component_excluded_pixels": contamination,
+        "shared_target_excluded_pixels": len(target & set(arc.excluded_xy)),
         "negative_supported_edge_count": forbidden_edge_count,
         "rejected_component_count": sum(not c.admitted_node_id for c in trace.components),
         "reviews": reviews,
     }
 
 
-def run_development_audit():
-    """One bounded stage audit, no confirmation calls and no model modification."""
-    start_wall_ns = time.perf_counter_ns()
-    start_cpu_ns = time.process_time_ns()
+def _public_identity(public):
+    return {
+        "format": public["format"], "raster_sha256": public["raster_digest"],
+        "shape": list(public["pixels_l8"].shape), "dtype": str(public["pixels_l8"].dtype),
+        "focus_box": list(public["focus_box"]), "anchor_px": list(public["anchor_px"]),
+        "budget_pixels": public["budget_pixels"],
+    }
+
+
+def _development_inputs():
+    pairs = [create_development_pair(i) for i in range(6)]
+    if _manifest([validate_pair(pair) for pair in pairs]) != DEVELOPMENT_MANIFEST_SHA256:
+        raise RuntimeError("development-manifest-drift")
+    return [(i, public, private) for i, pair in enumerate(pairs)
+            for public, private in pair] + [
+                (None, public, private) for public, private in create_controls()]
+
+
+def _provenance():
     import imageprogram
     import numpy as np
     from imageprogram.models.contextual_contour_cc01 import VERSION as MODEL_VERSION
+    from imageprogram.models.contextual_contour_cc02_trace import TRACE_VERSION
 
     if MODEL_VERSION != "contextual-contour-cc01-v2":
         raise RuntimeError("refuse-non-frozen-model")
-    from adapters.imageprogram_reference import contextual_contour_cc02_pilot as pilot
-
     model_root = Path(imageprogram.__file__).resolve().parents[2]
-    arena_root = Path(pilot.__file__).resolve().parents[2]
-    model_sha = _git_sha(model_root)
-    arena_sha = _git_sha(arena_root)
+    arena_root = Path(__file__).resolve().parents[2]
+    model_sha, arena_sha = _git_sha(model_root), _git_sha(arena_root)
     if "unknown" in (model_sha, arena_sha):
         raise RuntimeError("paired-git-checkout-sha-required")
+    sources = {
+        "model_observer": model_root / "src/imageprogram/models/contextual_contour_cc01.py",
+        "model_public_trace": model_root / "src/imageprogram/models/contextual_contour_cc02_trace.py",
+        "model_uv_lock": model_root / "uv.lock",
+        "model_pyproject": model_root / "pyproject.toml",
+        "arena_generator": Path(__file__).with_name("contextual_contour_cc02_tasks.py"),
+        "arena_pilot": Path(__file__).with_name("contextual_contour_cc02_pilot.py"),
+        "arena_auditor": Path(__file__),
+    }
+    return {
+        "model_sha": model_sha, "arena_sha": arena_sha,
+        "model_version": MODEL_VERSION, "trace_version": TRACE_VERSION,
+        "runtime": {"python": platform.python_version(), "numpy": np.__version__},
+        "source_file_sha256": {key: _file_sha(path) for key, path in sources.items()},
+        "checkout_dirty": {
+            name: bool(subprocess.check_output(
+                ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+                text=True)) for name, root in (("model", model_root), ("arena", arena_root))
+        },
+    }
 
-    pairs = [create_development_pair(i) for i in range(6)]
-    manifests = [validate_pair(pair) for pair in pairs]
-    manifest_hash = _manifest(manifests)
-    if manifest_hash != DEVELOPMENT_MANIFEST_SHA256:
-        raise RuntimeError("development-manifest-drift")
 
-    # Phase one: NO private annotations / outcome grading. Store snapshots first.
-    pending = []
-    for i, pair in enumerate(pairs):
-        for public, private in pair:
-            trace, receipt = _public_observe(public)
-            pending.append((i, public, private, trace, receipt))
-    controls = []
-    for public, private in create_controls():
-        trace, receipt = _public_observe(public)
-        controls.append((public, private, trace, receipt))
-    pregrade_receipts = [rec for _, _, _, _, rec in pending] + [
-        rec for _, _, _, rec in controls
-    ]
-    receipts_sha = _sha_json(pregrade_receipts)
+def predict_development():
+    """Public predictions only. Serialize this result BEFORE invoking the grader."""
+    start_wall, start_cpu = time.perf_counter_ns(), time.process_time_ns()
+    provenance = _provenance()
+    receipts = []
+    for _, public, _ in _development_inputs():
+        _, receipt = _public_observe(public)
+        receipts.append(receipt)
+    return {
+        "experiment_id": "CC-02-V-001", "phase": "PREDICT", "arena_version": VERSION,
+        "development_manifest_sha256": DEVELOPMENT_MANIFEST_SHA256,
+        **provenance, "config": dict(FROZEN_CONFIG),
+        "config_sha256": _sha_json(FROZEN_CONFIG),
+        "pregrade_receipts_sha256": _sha_json(receipts), "pregrade_receipts": receipts,
+        "wall_elapsed_ns": time.perf_counter_ns() - start_wall,
+        "cpu_elapsed_ns": time.process_time_ns() - start_cpu,
+        "confirmation": "NOT SCORED", "real_art": "NOT RUN",
+    }
 
-    # Phase two: Arena-private sidecars are now allowed. Detect any
-    # indistinguishable full public input with contradictory hidden labels.
-    collision_labels = {}
-    for _, public, private, _, _ in pending:
-        public_identity = (
-            public["format"], public["raster_digest"], public["focus_box"],
-            public["anchor_px"], public["budget_pixels"],
-        )
-        collision_labels.setdefault(public_identity, set()).add(private.expected_action)
-    for public, private, _, _ in controls:
-        public_identity = (
-            public["format"], public["raster_digest"], public["focus_box"],
-            public["anchor_px"], public["budget_pixels"],
-        )
-        collision_labels.setdefault(public_identity, set()).add(private.expected_action)
-    unidentifiable = sum(len(labels) > 1 for labels in collision_labels.values())
-    if unidentifiable:
+
+def _decode_trace(value):
+    # Plain data reconstruction: grading NEVER reruns observe_graph or select.
+    graph = value["graph"]
+    return SimpleNamespace(
+        **{key: val for key, val in value.items() if key not in ("graph", "components")},
+        graph=SimpleNamespace(
+            **{key: val for key, val in graph.items() if key not in ("nodes", "edges")},
+            nodes=tuple(SimpleNamespace(**n) for n in graph["nodes"]),
+            edges=tuple(SimpleNamespace(**e) for e in graph["edges"])),
+        components=tuple(SimpleNamespace(**{**c, "pixels_xy": tuple(map(tuple, c["pixels_xy"]))})
+                         for c in value["components"]),
+    )
+
+
+def _validate_receipt(receipt, public):
+    from imageprogram.models.contextual_contour_cc02_trace import TRACE_VERSION, evidence_digest
+
+    if receipt["public_input"] != _public_identity(public):
+        raise ValueError("receipt-public-input-mismatch")
+    trace = _decode_trace(receipt["trace"])
+    graph_payload = {
+        "nodes": receipt["trace"]["graph"]["nodes"],
+        "edges": receipt["trace"]["graph"]["edges"],
+        "version": trace.graph.version,
+        "threshold": trace.threshold, "max_gap": trace.max_gap,
+    }
+    if (trace.public_raster_sha256 != public["raster_digest"] or
+            receipt["raster_sha256"] != public["raster_digest"] or
+            list(trace.raster_shape) != list(public["pixels_l8"].shape) or
+            list(trace.focus_box) != list(public["focus_box"]) or
+            trace.threshold != FROZEN_CONFIG["threshold"] or
+            trace.max_gap != FROZEN_CONFIG["max_gap"] or
+            trace.max_nodes != FROZEN_CONFIG["max_nodes"] or
+            trace.max_pixels != FROZEN_CONFIG["max_pixels"] or
+            trace.trace_version != TRACE_VERSION or
+            _sha_json(graph_payload) != receipt["graph_sha256"] or
+            evidence_digest(trace) != receipt["trace_sha256"] or
+            trace.graph.candidate_set_sha256 != receipt["graph_sha256"] or
+            len(trace.graph.nodes) != receipt["nodes"] or
+            len(trace.graph.edges) != receipt["edges"]):
+        raise ValueError("receipt-trace-mismatch")
+    decisions = receipt["decisions"]
+    node_ids = {n.node_id for n in trace.graph.nodes}
+    if ([d["arm"] for d in decisions] != ["A1", "B", "B-shuffle"] or
+            any(d["candidate_set_sha256"] != receipt["graph_sha256"] or
+                d["version"] != trace.graph.version or
+                not set(d["selected_nodes"]) <= node_ids or
+                d["action"] not in ("continue", "stop", "hold") for d in decisions)):
+        raise ValueError("receipt-decisions-mismatch")
+    return trace
+
+
+def grade_development(prediction, *, expected_prediction_sha256):
+    """Grade a saved prediction under an externally retained digest; no inference."""
+    if _sha_json(prediction) != expected_prediction_sha256:
+        raise ValueError("prediction-digest-mismatch")
+    if (prediction["phase"] != "PREDICT" or prediction["arena_version"] != VERSION or
+            prediction["development_manifest_sha256"] != DEVELOPMENT_MANIFEST_SHA256 or
+            prediction["config"] != FROZEN_CONFIG or
+            prediction["config_sha256"] != _sha_json(FROZEN_CONFIG) or
+            prediction["pregrade_receipts_sha256"] != _sha_json(prediction["pregrade_receipts"])):
+        raise ValueError("prediction-contract-mismatch")
+    current = _provenance()
+    if any(prediction[key] != current[key] for key in
+           ("model_version", "trace_version", "source_file_sha256")):
+        raise ValueError("prediction-code-provenance-mismatch")
+    inputs = _development_inputs()
+    receipts = prediction["pregrade_receipts"]
+    if len(receipts) != len(inputs):
+        raise ValueError("prediction-case-count-mismatch")
+    pending, controls, collision_labels = [], [], {}
+    for (index, public, private), receipt in zip(inputs, receipts, strict=True):
+        trace = _validate_receipt(receipt, public)
+        identity = _sha_json(_public_identity(public))
+        collision_labels.setdefault(identity, set()).add(private.expected_action)
+        if index is None:
+            d = next(d for d in receipt["decisions"] if d["arm"] == "B")
+            controls.append({"member_id": private.member_id, "actual": d["action"],
+                             "expected": private.expected_action,
+                             "correct": d["action"] == private.expected_action})
+        else:
+            pending.append((index, public, private, trace, receipt))
+    if any(len(labels) > 1 for labels in collision_labels.values()):
         raise RuntimeError("unidentifiable-contradictory-public-inputs")
-
-    graded = [
-        _review_dev(private, development_private_arc(i, private), trace, receipt, public)
-        for i, public, private, trace, receipt in pending
-    ]
-    control_grades = []
-    for public, private, trace, receipt in controls:
-        for d in receipt["decisions"]:
-            if d["arm"] == "B":
-                control_grades.append({
-                    "member_id": private.member_id,
-                    "actual": d["action"], "expected": private.expected_action,
-                    "correct": d["action"] == private.expected_action,
-                })
+    graded = [_review_dev(private, development_private_arc(index, private), trace, receipt, public)
+              for index, public, private, trace, receipt in pending]
     by_arm = {}
     for arm_idx, arm in enumerate(("A1", "B", "B-shuffle")):
         decisions = [row["reviews"][arm_idx] for row in graded]
         by_arm[arm] = {
-            "correct_members": sum(d["correct"] for d in decisions),
-            "members": len(decisions),
-            "both_correct_pairs": sum(
-                all(graded[2 * i + j]["reviews"][arm_idx]["correct"] for j in range(2))
-                for i in range(6)
-            ),
-            "pairs": 6,
-            "holds": sum(d["action"] == "hold" for d in decisions),
-            "false_continues": sum(
-                d["action"] == "continue" and d["expected"] == "stop"
-                for d in decisions
-            ),
+            "correct_members": sum(d["correct"] for d in decisions), "members": len(decisions),
+            "both_correct_pairs": sum(all(graded[2*i+j]["reviews"][arm_idx]["correct"]
+                                          for j in range(2)) for i in range(6)),
+            "pairs": 6, "holds": sum(d["action"] == "hold" for d in decisions),
+            "false_continues": sum(d["action"] == "continue" and d["expected"] == "stop"
+                                   for d in decisions),
         }
-    b_continue = [r for r in graded if r["member_id"].endswith("-continue")]
+    stages = ("P-evidence-not-admitted", "target-ownership-unresolved",
+              "local-selection-unresolved", "G-correct-relation-absent",
+              "R-selection-or-unobserved-path", "action-correct-path-unverified")
+    positives = [r for r in graded if r["target_pixels"]]
     return {
-        "experiment_id": "CC-02-V-001",
-        "status": "development-only-stage-audit",
-        "model_version": MODEL_VERSION,
-        "runtime": {"python": platform.python_version(), "numpy": np.__version__},
-        "wall_elapsed_ns": time.perf_counter_ns() - start_wall_ns,
-        "cpu_elapsed_ns": time.process_time_ns() - start_cpu_ns,
-        "trace_version": "cc02-v-public-trace-v1",
-        "arena_version": VERSION,
-        "model_sha": model_sha,
-        "arena_sha": arena_sha,
-        "development_manifest_sha256": manifest_hash,
-        "config": FROZEN_CONFIG,
-        "config_sha256": _sha_json(FROZEN_CONFIG),
-        "source_file_sha256": {
-            "model_observer": _file_sha(
-                model_root / "src/imageprogram/models/contextual_contour_cc01.py"),
-            "model_public_trace": _file_sha(
-                model_root / "src/imageprogram/models/contextual_contour_cc02_trace.py"),
-            "model_uv_lock": _file_sha(model_root / "uv.lock"),
-            "model_pyproject": _file_sha(model_root / "pyproject.toml"),
-            "arena_generator": _file_sha(
-                arena_root / "adapters/imageprogram_reference/contextual_contour_cc02_tasks.py"),
-            "arena_auditor": _file_sha(Path(__file__)),
-        },
-        "zero_tolerance_synthetic_support": True,
-        "pregrade_receipts_sha256": receipts_sha,
-        "pregrade_receipts": pregrade_receipts,
-        "private_reviews": graded,
-        "controls": control_grades,
-        "summary": {
-            "by_arm": by_arm,
-            "b_positive_earliest_blockers": {
-                key: sum(row["reviews"][1]["earliest_blocker"] == key
-                         for row in b_continue)
-                for key in ("P-evidence-not-admitted", "G-correct-relation-absent",
-                            "R-selection-or-unobserved-path", "correct")
-            },
-        },
+        **{k: v for k, v in prediction.items() if k != "phase"},
+        "phase": "GRADE", "status": "development-only-stage-audit",
+        "prediction_sha256": expected_prediction_sha256,
+        "private_reviews": graded, "controls": controls,
+        "summary": {"by_arm": by_arm,
+                    "b_positive_earliest_blockers": {
+                        key: sum(r["reviews"][1]["earliest_blocker"] == key for r in positives)
+                        for key in stages}},
         "annotation_scope": "synthetic-program-derived, single author; NO real-art adjudication",
-        "unidentifiable_public_input_count": unidentifiable,
-        "confirmation": "NOT SCORED",
-        "real_art": "NOT RUN",
-        "canvas": "NOT RUN",
-        "motor": "NOT RUN",
-        "replay": "NOT RUN",
+        "unidentifiable_public_input_count": 0,
+        "canvas": "NOT RUN", "motor": "NOT RUN", "replay": "NOT RUN",
     }
+
+
+def run_development_audit():
+    """Convenience integration check only; CLI split phases are the evidence path."""
+    prediction = predict_development()
+    result = grade_development(prediction, expected_prediction_sha256=_sha_json(prediction))
+    result["execution_mode"] = "IN_PROCESS_INTEGRATION_CHECK"
+    return result
+
+
+def _write_new(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(value, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--development", action="store_true", required=True)
+    parser.add_argument("--phase", choices=("predict", "grade"), required=True)
+    parser.add_argument("--prediction", type=Path)
+    parser.add_argument("--expected-prediction-sha256")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     if args.out.exists():
         raise ValueError("refuse-overwrite-evidence")
-    result = run_development_audit()
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(result, sort_keys=True, indent=2, ensure_ascii=False) +
-                        "\n", encoding="utf-8")
-    print({
-        "experiment": result["experiment_id"],
-        "manifest": result["development_manifest_sha256"],
-        "receipt_sha": result["pregrade_receipts_sha256"],
-        "summary": result["summary"],
-        "out": str(args.out),
-    })
+    if args.phase == "predict":
+        if args.prediction or args.expected_prediction_sha256:
+            parser.error("predict takes no grading inputs")
+        result = predict_development()
+    else:
+        if not args.prediction or not args.expected_prediction_sha256:
+            parser.error("grade requires --prediction and --expected-prediction-sha256")
+        result = grade_development(json.loads(args.prediction.read_text(encoding="utf-8")),
+                                  expected_prediction_sha256=args.expected_prediction_sha256)
+    _write_new(args.out, result)
+    print({"phase": result["phase"], "sha256": _sha_json(result),
+           "receipts_sha256": result["pregrade_receipts_sha256"],
+           "summary": result.get("summary"), "out": str(args.out)})
 
 
 if __name__ == "__main__":
