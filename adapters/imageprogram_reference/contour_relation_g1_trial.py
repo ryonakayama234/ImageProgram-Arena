@@ -5,9 +5,11 @@ independent/blind target-arc review, selected path inference or drawing.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 from dataclasses import asdict
+from pathlib import Path
 
 from imageprogram.models.contextual_contour_cc01 import _relation
 from imageprogram.models.contour_relation_g1 import fragment_digest, propose_relations
@@ -80,3 +82,34 @@ def grade(saved, retained_sha):
             "g1_correct": sum(x["g1_match"] for x in labels),
             "scored_pairs": len(labels), "reviews": reviews,
             "original_confirmation": "NOT_RUN", "selected_path": "NOT_RUN"}
+
+
+def _write_new(path: Path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(data, stream, indent=2, sort_keys=True, ensure_ascii=False)
+        stream.write("\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--phase", choices=("predict", "grade"), required=True)
+    parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--receipt", type=Path)
+    parser.add_argument("--expected-sha256")
+    args = parser.parse_args()
+    if args.phase == "predict":
+        if args.receipt is not None or args.expected_sha256 is not None:
+            parser.error("predict-accepts-no-private-grading-inputs")
+        record = predict()
+        print("ANCHOR_BEFORE_GRADE_SHA256", _canonical_sha(record))
+    else:
+        if not args.receipt or not args.expected_sha256:
+            parser.error("grade-requires-saved-receipt-and-external-anchor")
+        record = grade(json.loads(args.receipt.read_text(encoding="utf-8")),
+                       args.expected_sha256)
+    _write_new(args.out, record)
+
+
+if __name__ == "__main__":
+    main()
