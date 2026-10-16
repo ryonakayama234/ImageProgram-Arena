@@ -25,14 +25,14 @@ class PublicTask:
 def public_tasks() -> tuple[PublicTask, ...]:
     origin = ((0., 0.), (10., 0.))
     families = (
-        ("slanted-positive", (((14., 1.), (21., 6.)),)),
-        ("curved-positive", (((14., -1.), (21., -5.)),)),
-        ("straight-positive", (((14., 0.), (24., 0.)),)),
-        ("parallel-negative", (((10., 5.), (21., 5.)),)),
-        ("crossing-negative", (((6., 3.), (6., -3.)),)),
-        ("side-negative", (((15., 6.), (23., 11.)),)),
-        ("competing-unknown", (((14., 1.), (22., 4.)), ((14., -1.), (22., -4.)))),
-        ("junction-zero-unknown", (((10., 0.), (20., 0.)),)),
+        ("gdev-00", (((14., 1.), (21., 6.)),)),
+        ("gdev-01", (((14., -1.), (21., -5.)),)),
+        ("gdev-02", (((14., 0.), (24., 0.)),)),
+        ("gdev-03", (((10., 5.), (21., 5.)),)),
+        ("gdev-04", (((6., 3.), (6., -3.)),)),
+        ("gdev-05", (((15., 6.), (23., 11.)),)),
+        ("gdev-06", (((14., 1.), (22., 4.)), ((14., -1.), (22., -4.)))),
+        ("gdev-07", (((10., 0.), (20., 0.)),)),
     )
     return tuple(PublicTask(label, tuple([_fragment("a", *origin)] + [
         _fragment(chr(98 + j), *ends) for j, ends in enumerate(others)
