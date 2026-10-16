@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import platform
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -224,7 +226,10 @@ def _review_dev(private, arc, trace, receipt, public):
 
 def run_development_audit():
     """One bounded stage audit, no confirmation calls and no model modification."""
+    start_wall_ns = time.perf_counter_ns()
+    start_cpu_ns = time.process_time_ns()
     import imageprogram
+    import numpy as np
     from imageprogram.models.contextual_contour_cc01 import VERSION as MODEL_VERSION
 
     if MODEL_VERSION != "contextual-contour-cc01-v2":
@@ -280,6 +285,9 @@ def run_development_audit():
         "experiment_id": "CC-02-V-001",
         "status": "development-only-stage-audit",
         "model_version": MODEL_VERSION,
+        "runtime": {"python": platform.python_version(), "numpy": np.__version__},
+        "wall_elapsed_ns": time.perf_counter_ns() - start_wall_ns,
+        "cpu_elapsed_ns": time.process_time_ns() - start_cpu_ns,
         "trace_version": "cc02-v-public-trace-v1",
         "arena_version": VERSION,
         "model_sha": _git_sha(Path(imageprogram.__file__).resolve().parents[2]),
