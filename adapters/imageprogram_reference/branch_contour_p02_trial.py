@@ -116,7 +116,11 @@ def _source_masks(family, case_id, public):
     if family == "technical":
         index = next(i for i, c in enumerate(CASES)
                      if case_id.startswith(c[0] + ":"))
-        from adapters.imageprogram_reference.branch_contour_p02_private import (\n            SOURCE_STROKE_INDICES,\n        )\n        _, strokes = CASES[index]\n        chosen, excluded = SOURCE_STROKE_INDICES[index]
+        from adapters.imageprogram_reference.branch_contour_p02_private import (
+            SOURCE_STROKE_INDICES,
+        )
+        _, strokes = CASES[index]
+        chosen, excluded = SOURCE_STROKE_INDICES[index]
         target = _stroke(*strokes[chosen]) if chosen is not None else set()
         other = _stroke(*strokes[excluded]) if excluded is not None else set()
         # Shared observed junction ink is not forbidden-exclusive ink.
@@ -183,7 +187,8 @@ def _write_new(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8") as handle:
         json.dump(data, handle, sort_keys=True, indent=2, ensure_ascii=False)
-        handle.write("\n")
+        handle.write("
+")
 
 
 def main():
