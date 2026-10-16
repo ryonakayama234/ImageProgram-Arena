@@ -1,0 +1,57 @@
+{
+  "protocol": "cc02-l0-l1-review-local-smoke-v1",
+  "date_jst": "2026-10-16",
+  "stage": "ADD-ONLY INFRASTRUCTURE; human reviews NOT RUN",
+  "frozen_p02_reference": {
+    "observation_canonical_sha256": "01d4cb52b2cc62f86c06730b9bc00982e03209ad14b2c7b519f0d1d1796b0af0",
+    "arena_source": "7a7c26815472ae2bc866415f04c5d9888f0d4021",
+    "model_source": "531d78d365b4c7882a3898a3e11fda3e809b4857",
+    "task_ids": [
+      "obs-02",
+      "obs-10",
+      "obs-11"
+    ],
+    "pair_counts": [
+      3,
+      6,
+      1
+    ],
+    "original_confirmation": "NOT_RUN"
+  },
+  "github_verified_blob_sha1": {
+    "runner": "ace1c4f4258738a8cb71a0de39858c15a5e35c82",
+    "tests": "dc30b090a96c8c251c235044f21a06c2314d6f23",
+    "review_scope": "5fb30466c1b7189e693d3cbc5b34efd5253d0cdc"
+  },
+  "local_validation": {
+    "python": "3.13.5",
+    "isolated_unittest": "8/8 PASS",
+    "py_compile": "PASS",
+    "whole_repo_python_3_12": "NOT_RUN",
+    "ruff": "NOT_RUN",
+    "public_raster_renderer": "SMOKE PASS on mocked 27-rasters, NOT source-exact P02",
+    "mock_renderer_files": [
+      "obs-02.png",
+      "obs-02-geometry.svg",
+      "obs-10.png",
+      "obs-10-geometry.svg",
+      "obs-11.png",
+      "obs-11-geometry.svg",
+      "packet.json",
+      "reviewer-A.json",
+      "reviewer-B.json"
+    ],
+    "full_original_observation_replay": "NOT_RUN"
+  },
+  "review": {
+    "two_independent_human_reviews": "NOT_RUN",
+    "visible_l0_annotation": "NOT_RUN",
+    "relation_l1_annotation": "NOT_RUN",
+    "l2_task_intent": "NOT_EVALUABLE",
+    "original_confirmation": "NOT_RUN",
+    "g0_g1_rescore": "NOT_RUN",
+    "real_art": "NOT_RUN",
+    "drawing_skill": "NOT_RUN"
+  },
+  "decision": "SELECT audit instrument only; defer G1 promotion, R path and real drawing"
+}
