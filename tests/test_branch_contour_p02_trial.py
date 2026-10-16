@@ -13,6 +13,8 @@ from adapters.imageprogram_reference.branch_contour_p02_trial import (
 class BranchContourP02ArenaTests(unittest.TestCase):
     def test_exact_technical_fixture_and_private_masks(self):
         self.assertEqual(len(CASES), 12)
+        for case in CASES:
+            self.assertEqual(len(case), 2)  # no target/excluded labels in PUBLIC bank
         for i in range(len(CASES)):
             name, public = _technical_public(i)
             self.assertEqual(public["pixels_l8"].shape, (72, 72))
