@@ -1,7 +1,7 @@
 import unittest
 from itertools import combinations
 
-from contour_l1_recover_scope import (
+from adapters.imageprogram_reference.contour_l1_recover_scope import (
     EVIDENCE_GIT_BLOB_SHA1, EXPECTED_ORIGINAL_OBSERVATION,
     digest, recover_scope,
 )
