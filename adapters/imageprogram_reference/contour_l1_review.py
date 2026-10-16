@@ -76,10 +76,24 @@ def make_packet(observation: dict, scope: dict):
         })
     if sum(len(x["pairs"]) for x in tasks) != 10 or len(tasks) != 3:
         raise ValueError("review-universe-drift")
-    return {"protocol": VERSION, "observation_sha256": scope["observation_sha256"],
-            "original_confirmation": "NOT_RUN", "review_status": "UNREVIEWED",
-            "l2_intent": "NOT_EVALUABLE", "tasks": tasks,
-            "method": "public-pixels-and-unlabeled-p02-support; no-G-output; no-source-label"}
+    packet = {"protocol": VERSION, "observation_sha256": scope["observation_sha256"],
+              "original_confirmation": "NOT_RUN", "review_status": "UNREVIEWED",
+              "l2_intent": "NOT_EVALUABLE", "tasks": tasks,
+              "method": "public-pixels-and-unlabeled-p02-support; no-G-output; no-source-label"}
+    if "reconstruction" in scope:
+        recovered = scope["reconstruction"]
+        if (recovered.get("method") != "cc02-l1-recovered-observation-scope-v1"
+                or recovered.get("case_fingerprints_compared") != 27
+                or recovered.get("identical_code_and_case_fingerprints") is not True
+                or recovered.get("new_digest_is_not_original_receipt") is not True):
+            raise ValueError("invalid-reconstruction-attestation")
+        packet["observation_provenance"] = {
+            "status": "REBUILT_VERIFIED_CASE_FINGERPRINTS_NOT_ORIGINAL_BYTES",
+            "original_observation_sha256": recovered["original_observation_sha256"],
+            "reconstructed_observation_sha256": scope["observation_sha256"],
+            "original_confirmation": "NOT_RUN",
+        }
+    return packet
 
 
 def blank_response(packet, reviewer_id: str):
