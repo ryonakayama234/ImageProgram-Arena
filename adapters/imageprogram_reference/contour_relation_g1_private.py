@@ -2,12 +2,12 @@
 # For question 'is relation a->b a continuation?' and optional second branch a->c.
 # Unknown examples are scored for representation/abstention only, not as path truth.
 EXPECTED_G_ONLY = {
-    "slanted-positive": {"a:b": "positive"},
-    "curved-positive": {"a:b": "positive"},
-    "straight-positive": {"a:b": "positive"},
-    "parallel-negative": {"a:b": "negative"},
-    "crossing-negative": {"a:b": "negative"},
-    "side-negative": {"a:b": "negative"},
-    "competing-unknown": {"a:b": "unknown", "a:c": "unknown"},
-    "junction-zero-unknown": {"a:b": "unknown"},
+    "gdev-00": {"a:b": "positive"},
+    "gdev-01": {"a:b": "positive"},
+    "gdev-02": {"a:b": "positive"},
+    "gdev-03": {"a:b": "negative"},
+    "gdev-04": {"a:b": "negative"},
+    "gdev-05": {"a:b": "negative"},
+    "gdev-06": {"a:b": "unknown", "a:c": "unknown"},
+    "gdev-07": {"a:b": "unknown"},
 }
