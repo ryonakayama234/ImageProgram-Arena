@@ -187,8 +187,7 @@ def _write_new(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8") as handle:
         json.dump(data, handle, sort_keys=True, indent=2, ensure_ascii=False)
-        handle.write("
-")
+        handle.write("\n")
 
 
 def main():
