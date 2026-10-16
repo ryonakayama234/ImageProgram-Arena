@@ -76,6 +76,10 @@ python -m adapters.imageprogram_reference.contextual_contour_cc02_v_audit \
   --development --out /tmp/cc02-v-001-private-audit.json
 ```
 
+The runner also refuses a run when either Model or Arena Git SHA is `unknown`, and includes SHA-256 of its frozen config, source modules, Model pyproject/lock (if present) and model/arena checkout heads. CPU time and wall elapsed time are measured separately from stable pre-grade receipt hashing.
+
+**Supplemental 2026-10-16 LOCAL-MIRROR smoke, NON-AUTHORITATIVE:** On a hand-reconstructed six-positive-scene NumPy 2.3.5 probe (Python 3.13.5, *not an ImageProgram checkout*), the observed first-stage blockers were `dev-00:G`, `dev-01:P`, `dev-02:G`, `dev-03:P`, `dev-04:correct`, `dev-05:P`. Target-arc exact raster coverage by admitted components was respectively `[1,0,1,0,1,0]`. This supports only a geometry sanity check against the historical local mirror, NOT the official v2 SHA-pinned audit and not a verified independent original-art annotation. Local probe SHA-256 `d9f2dfa083cfe9126141264ff518133202152241af150a8b05e6284edeb2a0b9`, available as a conversation artifact but not as an authoritative repository runner. The official audit counts remain NOT RUN.
+
 The runner refuses to overwrite the destination. The **unredacted** output contains private member IDs/target node matches; keep private local and do not commit. Summarize safe aggregate counts, unknown/halt, hashes, costs, Python/numpy versions, original Model+Arena SHA and all case strata in a separate experiment ledger only after execution.
 
 ### Experiment and negative ledger — as of this commit
