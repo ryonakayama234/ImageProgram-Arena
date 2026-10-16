@@ -3,7 +3,6 @@ import copy
 import importlib.util
 import json
 import unittest
-from itertools import combinations
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location("blind", Path(__file__).with_name("contour_l1_review.py"))
