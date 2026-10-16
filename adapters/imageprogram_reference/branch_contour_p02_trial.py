@@ -75,10 +75,10 @@ def _public_cases():
 
 
 def predict():
+    from imageprogram.models import branch_contour_p02 as branch_module
+    from imageprogram.models import contextual_contour_cc01 as baseline_module
     from imageprogram.models.branch_contour_p02 import observe_branch
     from imageprogram.models.contextual_contour_cc01 import observe_graph, select
-    from imageprogram.models import contextual_contour_cc01 as baseline_module
-    from imageprogram.models import branch_contour_p02 as branch_module
 
     source_hashes = {
         "p02_model": hashlib.sha256(Path(branch_module.__file__).read_bytes()).hexdigest(),

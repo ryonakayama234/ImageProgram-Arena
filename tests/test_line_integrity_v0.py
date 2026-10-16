@@ -3,11 +3,12 @@
 import unittest
 
 import numpy as np
+from PIL import Image, ImageDraw
+
 from adapters.imageprogram_reference.line_integrity_v0 import (
     IntegrityThresholdsV0,
     evaluate_line_integrity_v0,
 )
-from PIL import Image, ImageDraw
 
 
 class LineIntegrityV0Tests(unittest.TestCase):

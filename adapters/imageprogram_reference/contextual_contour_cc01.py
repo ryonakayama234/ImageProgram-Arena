@@ -4,6 +4,7 @@ Private label, paired intervention and source family never appear in public inpu
 No third-party/Google Drive art copied. Decision-only, not Motor/Canvas validation.
 """
 from __future__ import annotations
+
 import hashlib
 from dataclasses import dataclass
 

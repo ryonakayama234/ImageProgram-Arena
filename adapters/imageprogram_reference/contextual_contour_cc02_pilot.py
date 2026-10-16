@@ -86,6 +86,8 @@ def run_development():
     import imageprogram
     from imageprogram.models.contextual_contour_cc01 import (
         VERSION as MODEL_VERSION,
+    )
+    from imageprogram.models.contextual_contour_cc01 import (
         observe_graph,
         select,
     )
