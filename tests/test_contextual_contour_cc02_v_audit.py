@@ -66,6 +66,9 @@ class CC02VArcEvidenceTests(unittest.TestCase):
         self.assertEqual(len(result["controls"]), 3)
         self.assertEqual(len(result["pregrade_receipts"]), 15)
         self.assertEqual(result["summary"]["by_arm"]["B"]["correct_members"], 7)
+        self.assertEqual(result["summary"]["by_arm"]["B"]["both_correct_pairs"], 1)
+        self.assertEqual(result["summary"]["by_arm"]["B"]["false_continues"], 0)
+        self.assertEqual(result["unidentifiable_public_input_count"], 0)
         self.assertEqual(
             sum(result["summary"]["b_positive_earliest_blockers"].values()), 6)
         for rec in result["pregrade_receipts"]:
