@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -115,6 +117,31 @@ def grade_run(run_dir: Path, output: Path) -> dict:
               "grades": grades}
     output.mkdir(parents=True, exist_ok=False)
     (output / "independent_grade.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    # Offline Before/After comparison; copy only verified episode PNGs.
+    review = output / "review"
+    review.mkdir()
+    cards = []
+    for task_id in sorted(grouped):
+        initial = run_dir / "tasks" / task_id / "public" / "initial.png"
+        shutil.copyfile(initial, review / f"{task_id}-before.png")
+        figures = [f'<figure><img src="{task_id}-before.png"><figcaption>Before</figcaption></figure>']
+        for arm in ("A0_fixed", "A1_analytic", "A2_learned"):
+            source_png = run_dir / "tasks" / task_id / arm / "final.png"
+            target_name = f"{task_id}-{arm}.png"
+            shutil.copyfile(source_png, review / target_name)
+            verdict = "PASS" if grouped[task_id][arm]["quality_pass"] else "FAIL"
+            figures.append(f'<figure><img src="{target_name}"><figcaption>{arm}: {verdict}</figcaption></figure>')
+        cards.append(f'<section><h2>{html.escape(task_id)}</h2><div class="row">' + "".join(figures) + '</div></section>')
+    page = ('<!doctype html><html lang="en"><meta charset="utf-8">'
+            '<title>E2E-L01 before/after</title><style>'
+            'body{font:15px system-ui;margin:1.5em;max-width:1100px}'
+            '.row{display:flex;gap:1em;flex-wrap:wrap}'
+            'figure{margin:0;width:220px}img{width:100%;border:1px solid #888}'
+            'figcaption{font-size:13px}section{margin-bottom:2em}'
+            '</style><h1>E2E-L01 — real P1 Canvas comparison</h1>'
+            '<p>Independent synthetic transfer only. No visual acceptance claim.</p>'
+            + "".join(cards) + '</html>')
+    (review / "index.html").write_text(page, encoding="utf-8")
     return report
 
 
