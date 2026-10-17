@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import math
+import random
 import subprocess
 from pathlib import Path
 
@@ -40,6 +41,26 @@ def new_task(shape, level, phase=0):
         pixels[46][x] = 0
     excluded = [[x + 0.5, 46.5] for x in range(10, 54)]
     return _public(pixels, targets[0]), targets, [excluded]
+
+
+def heldout_task(seed, level):
+    """Distinct confirmation-only step-slope grammar; never tune on its output."""
+    rng = random.Random(seed)
+    pixels = [[255] * 64 for _ in range(64)]
+    y = rng.randrange(16, 28)
+    slope = rng.choice((-1, 0, 1))
+    target = []
+    for t, x in enumerate(range(12, 49)):
+        if t % 6 == 0:
+            slope = rng.choice((-1, 0, 1))
+        if rng.random() < 0.65:
+            y = max(13, min(36, y + slope))
+        pixels[y][x] = level
+        target.append([x + 0.5, y + 0.5])
+    for x in range(10, 54):
+        pixels[46][x] = 0
+    excluded = [[x + 0.5, 46.5] for x in range(10, 54)]
+    return _public(pixels, target[0]), target, [excluded]
 
 
 def _public(pixels, anchor):
@@ -113,14 +134,12 @@ def prepare(out, split):
                 add(f"dev-{shape}-l8-{l8}", f"dev-{shape}",
                     "unique_path", p, [t], excluded)
     else:
-        # Different registered geometric lineages and phase parameters.
-        # These are distinct parameterized geometries, *not* proof of
-        # performance outside this synthetic generator family.
+        # Confirmation uses a DIFFERENT stochastic step-slope generator
+        # with independent seeded draws, not the four DEV analytic templates.
+        # Do not preview, tune or grade these until the DEV settings freeze.
         for i in range(12):
-            shape = ("flat", "incline", "arc", "sine")[i % 4]
-            phase = 1 + i // 4
             l8 = (160, 180, 195)[i // 4]
-            p, t, excluded = new_task(shape, l8, phase=phase)
+            p, t, excluded = heldout_task(2026101703 + i * 10007, l8)
             add(f"confirm-lineage-{i:02d}", f"lineage-{i:02d}",
                 "unique_path", p, [t], excluded)
     for kind in ("blank", "four-noise-dots", "near-white",
