@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from collections import Counter
 from pathlib import Path
 
@@ -60,6 +61,9 @@ def walk(edges: dict, start: str, path: list[str]) -> str:
 
 def grade(public: dict, private: dict, prediction: dict,
           public_sha: str, private_sha: str, prediction_sha: str) -> dict:
+    if any(digest(obj) != sha for obj, sha in (
+            (public, public_sha), (private, private_sha), (prediction, prediction_sha))):
+        raise ValueError("unanchored-input")
     exact_keys(public, {"protocol", "cases", "split"}, "public")
     exact_keys(private, {"protocol", "public_sha256", "cases"}, "private")
     exact_keys(prediction, {"protocol", "public_sha256", "cases"}, "prediction")
@@ -72,6 +76,7 @@ def grade(public: dict, private: dict, prediction: dict,
         raise ValueError("invalid-split")
     if not isinstance(public["cases"], list) or not public["cases"]:
         raise ValueError("missing-public-cases")
+
     def index(rows, title):
         if not isinstance(rows, list):
             raise ValueError(title + "-not-list")
@@ -136,7 +141,9 @@ def grade(public: dict, private: dict, prediction: dict,
         else:
             endpoint = None
         if (decision["goal_status"] not in GOALS or decision["termination_reason"] not in REASONS
-                or type(decision["work_units"]) not in {int, float} or decision["work_units"] < 0):
+                or type(decision["work_units"]) not in {int, float}
+                or not math.isfinite(decision["work_units"])
+                or decision["work_units"] < 0):
             raise ValueError("invalid-decision-status-or-work")
         evidence = decision["endpoint_evidence"]
         if evidence is not None:
@@ -181,9 +188,16 @@ def grade(public: dict, private: dict, prediction: dict,
         if row["candidate_available"] is not None:
             totals["candidate_available"] += int(row["candidate_available"])
         totals["work_units"] += row["work_units"]
+        if row["kind"] == "unique_path":
+            totals["unique_success"] += int(row["success"])
+            totals["path_correct"] += int(bool(row["path_correct"]))
+            totals["candidate_unavailable"] += int(not row["candidate_available"])
+        else:
+            totals["control_success"] += int(row["success"])
     return {"protocol": VERSION, "stage": "grade", "split": public["split"],
             "public_sha256": public_sha, "private_sha256": private_sha,
             "prediction_sha256": prediction_sha, "results": rows, "counts": dict(totals),
+            "independent_source_families": len({r["family_id"] for r in rows}),
             "qualification": "synthetic-path-identity-not-natural-art-or-drawing",
             "original_confirmation": "NOT_RUN" if public["split"] == "development" else "EVALUATED",
             "model_was_reinvoked": False}
