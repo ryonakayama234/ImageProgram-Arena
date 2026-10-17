@@ -103,5 +103,20 @@ class PathGradeTests(unittest.TestCase):
             self.run_grade()
 
 
+    def test_incomplete_prefix_is_not_false_join(self):
+        row = self.pred["cases"][0]
+        row.update({"candidate_paths": [["e1"]], "selected_path": ["e1"],
+                    "goal_status": "unknown", "termination_reason": "observation_insufficient",
+                    "endpoint_evidence": None})
+        graded = self.run_grade()
+        self.assertFalse(graded["results"][0]["false_join"])
+        self.assertFalse(graded["results"][0]["success"])
+
+    def test_direct_unanchored_inputs_rejected(self):
+        with self.assertRaisesRegex(ValueError, "unanchored-input"):
+            grade(self.public, self.private, self.pred, "0" * 64,
+                  digest(self.private), digest(self.pred))
+
+
 if __name__ == "__main__":
     unittest.main()
