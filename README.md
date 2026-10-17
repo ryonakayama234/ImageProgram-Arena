@@ -1,5 +1,10 @@
 # ImageProgram-Arena
 
+
+## E2E-L01 independent evaluation candidate (2026-10-17)
+See [E2E-L01 benchmark](benchmarks/e2e_l01/README.md) for the public/private boundary, P1 manifest integrity checks and offline Before/After Review Pack. Isolated synthetic grader tests 3/3 PASS; full P1 Episode scoring and learned transfer NOT RUN / NOT DEMONSTRATED. Draft only.
+
+
 ImageProgram-Arena is the embodied experiment and experience-generation side of the ImageProgram project.
 
 Its job is not to own the painter's model logic. It provides reproducible tasks, bodies/world adapters, execution isolation, episode collection, evaluator-private diagnostics, and benchmark comparison so that ImageProgram can learn from real or simulated drawing experience without mixing evaluation secrets into policy inputs.
