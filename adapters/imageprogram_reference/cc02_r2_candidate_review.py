@@ -134,6 +134,10 @@ def grade(public, private, prediction, public_sha, private_sha, prediction_sha):
                     or candidate["candidate_id"] in candidate_paths):
                 raise ValueError("candidate-identity-or-path-drift")
             candidate_paths[candidate["candidate_id"]] = path
+        if obs.get("status") not in ("observed", "unknown", "unsupported", "budget_exceeded"):
+            raise ValueError("invalid-observer-status")
+        if obs["status"] == "budget_exceeded" and candidates:
+            raise ValueError("partial-budget-bank")
         selected = obs.get("legacy_selected_candidate_id")
         if selected is not None and selected not in candidate_paths:
             raise ValueError("legacy-selection-not-in-bank")
