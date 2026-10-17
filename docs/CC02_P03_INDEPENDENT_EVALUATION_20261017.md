@@ -53,6 +53,17 @@ Provisional engineering gate from [Model #112](https://github.com/ryonakayama234
 
 Use Model [documented P03 runbook](https://github.com/ryonakayama234/ImageProgram/blob/research/cc02-p03-faint-path-bank-v0/docs/CC02_P03_FAINT_FULL_PATH_20261017.md). In particular PREPARE, externally append-only public/private SHA anchor, PREDICT with pinned clean Model checkout, externally append-only prediction SHA, **then separate-process GRADE**, with no access to evaluator-private geometry in Model subprocess.
 
+## First user-run WSL2 test evidence — 2026-10-17
+
+Local evidence reported by user from `/home/zhong/imageprogram-p03-idZMcH/validation.log`, before Arena test fix:
+- Model commit `07e1975741976cc39a10bb2f16edeb2520499efd`: **295 / 295 Python tests PASS** (`73.756s`), including all ten new P03 tests; **full Model Ruff PASS**.
+- Arena commit `ed578bd23662c70e671ae5c127b144495583b09d`: **9 / 10 P03 tests PASS, 1 FAIL** (`0.098s`). Failure: `test_dev_and_confirmation_generators_are_disjoint` incorrectly treated the five intentionally shared immutable controls as forbidden overlapping source IDs. The positive-case IDs *were* disjoint. This was a test-assertion defect, not an OOM or an observed candidate-recall failure.
+- Free available memory ~6.8 GiB, no matching kernel OOM trace in the supplied diagnostic; interactive shell had `set -euo pipefail` and exited on the failed test.
+- `PREPARE` as a named execution phase, public/private externally pinned SHAs, `PREDICT`, `GRADE`, Arena whole suite, changed-file Ruff: **NOT RUN** (shell exited before those steps). Temporary manifests emitted *within the unittest* must not be confused with the externally pinned DEV/confirmation experiment.
+- Follow-up commit [test correction](https://github.com/ryonakayama234/ImageProgram-Arena/commit/e0136d5a80708d0d84add4c06d56da4be5cbda1e): assert distinct **positive** IDs (24 DEV, 12 confirmation) and exact re-use/hash identity of five **negative controls** across splits. This code was committed to the Draft branch, but its corrected result still requires rerun under WSL2.
+
+All numerical measurements above refer to the **previous commit**. Do not re-label them as verification of the new corrected commit. The confirmation test generated manifests but neither model predictions nor private scoring; real held-out confirmation must remain unused pending DEV freeze.
+
 A new source-exact Python3.12 run and full locked tests have **NOT RUN** in this connector-only session. No claimed dev/confirmation success, no 10/12 PASS, and no final performance adoption. Existing R2 historical development observations (6/8, conditional 2/6) are **context only**. Source-exact run requires WSL2 checkouts with the full codebase and matching uv.lock; a GitHub file write is not execution. No paid CI invoked.
 
 ## Decision
