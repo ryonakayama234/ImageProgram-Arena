@@ -106,9 +106,16 @@ def grade(public, private, prediction, public_sha, private_sha, prediction_sha):
                 or digest({k: v for k, v in obs.items() if k != "canonical_sha256"})
                 != existing_digest):
             raise ValueError("candidate-bank-hash-mismatch")
+        if (obs.get("stage") != "public-candidate-bank"
+                or obs.get("private_target_used") is not False
+                or not isinstance(obs.get("observer_source_sha256"), str)
+                or len(obs["observer_source_sha256"]) != 64):
+            raise ValueError("missing-public-source-provenance")
         candidates = obs.get("candidates")
-        if not isinstance(candidates, list):
-            raise ValueError("missing-full-candidates")
+        if not isinstance(candidates, list) or len(candidates) > 128:
+            raise ValueError("missing-or-overbudget-candidates")
+        if sum(len(c.get("ordered_xy", [])) for c in candidates if isinstance(c, dict)) > 32768:
+            raise ValueError("candidate-vertex-work-budget")
         declared_count = obs.get("diagnostic_work", {}).get("candidate_count")
         if declared_count != len(candidates):
             raise ValueError("candidate-count-drift")
@@ -175,6 +182,12 @@ def grade(public, private, prediction, public_sha, private_sha, prediction_sha):
             counts["budget_exceeded"] += 1
     counts["source_families"] = len({row["family_id"] for row in rows
                                     if row["kind"] == "unique_path"})
+    available = counts["candidate_available"]
+    counts["candidate_recall"] = (
+        available / counts["unique"] if counts["unique"] else None)
+    counts["selection_accuracy_given_available"] = (
+        sum(bool(row["legacy_selected_correct"]) for row in rows
+            if row["candidate_available"]) / available if available else None)
     return {"protocol": VERSION, "stage": "grade-candidate-availability",
             "public_sha256": public_sha, "private_sha256": private_sha,
             "prediction_sha256": prediction_sha, "counts": dict(counts),
