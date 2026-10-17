@@ -103,7 +103,7 @@ def predict(out, model_checkout, model_python, public_sha):
             raise ValueError("unanchored-task")
         outfile = root / f"bank-{i:02d}.json"
         subprocess.run([
-            str(model_python), "-m", "scripts.cc02_r2_export_bank",
+            str(model_python), str(model_checkout / "scripts" / "cc02_r2_export_bank.py"),
             "--public", str(public_file),
             "--public-sha256", case["public_task_sha256"],
             "--out", str(outfile),
