@@ -66,8 +66,8 @@ The original frozen 17-case records have not been verified as directly compatibl
 
 ## Experiment ledger (actually executed locally, 2026-10-17)
 
-- Python3.13.5 local isolated synthetic test suite: 9/9 PASS, py_compile PASS.
-- Scenarios: correct unique path and ambiguous control; wrong branch; all-HOLD fails unique; disconnected path; missing case; private data in public record; parent hash mismatch; false satisfaction without endpoint evidence; disconnected private target.
+- Python3.13.5 local isolated synthetic test suite: 11/11 PASS, py_compile PASS.
+- Scenarios: correct unique path and ambiguous control; wrong branch; all-HOLD fails unique; disconnected path; missing case; private data in public record; parent hash mismatch; false satisfaction without endpoint evidence; disconnected private target; incomplete prefix vs false join; unanchored direct grader call.
 - Local CLI smoke using 2 toy cases, authentic CLI, three matching canonical SHA values, new output file: PASS. Counts: cases=2, unique=1, control=1, unique_success=1, control_success=1, false_join=0, work_units=4.
 - No exact historical 17-case grading; no Model inference improvement; no actual image drawing; no learned Skill; no original sealed confirmation read. Full repo tests and Ruff in authenticated Python3.12 source-exact GitHub checkouts: NOT RUN. Existing G1 test evidence does not carry over to this branch.
 
