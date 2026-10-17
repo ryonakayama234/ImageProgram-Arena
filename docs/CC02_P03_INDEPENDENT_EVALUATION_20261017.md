@@ -39,7 +39,7 @@ erDiagram
 
 DEV dataset planned by code: 8 R2 legacy synthetic re-renders + 16 positives from four geometry templates crossed with L8 140/160/180/195 + five controls (blank, isolated noise points, near-white line, weak distractor-only and over-budget candidate flood) = **29 cases**. Dataset counts must still be verified in a source-exact run. Source-lineage grouping and counts must use actual generated `public.json`. One source geometry rendered at four contrast levels is paired/correlated, not four independent samples.
 
-Confirmation planned: twelve geometry/phase/contrast parameterizations generated only after protocol freeze, plus five controls (17 cases); same parametric grammar means the 12 should **not** be interpreted as 12 independent drawing domains. Any upgrade of scientific generalization claims requires genuinely disjoint geometry grammars and source lines.
+Confirmation planned: twelve deterministic seeded draws from a **separate step-slope grammar** (never scored, never tuned) after DEV freeze plus five controls (17 cases). These twelve lineages are distinct draws but not twelve unrelated artwork domains. A discarded earlier parameter-variant confirmation design was previewed in an unverified local algorithm proxy; its observations are NOT confirmation evidence and it has been replaced before any source-exact test.
 
 Evaluation:
 - baseline R2 candidate_available; P03 full-bank available; *paired* newly_recovered; conditioned count by geometry and brightness
