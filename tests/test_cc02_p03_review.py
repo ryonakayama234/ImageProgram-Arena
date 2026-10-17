@@ -138,13 +138,32 @@ class P03IndependentReviewTests(unittest.TestCase):
             grade(self.bundle)
 
     def test_dev_and_confirmation_generators_are_disjoint(self):
+        # Positive/target-bearing tasks are separated by lineage. Five
+        # deliberately frozen negative controls are reused across splits;
+        # their public task hashes must be identical, not treated as leakage.
         with tempfile.TemporaryDirectory() as temp:
-            dev, _ = pilot.prepare(Path(temp) / "dev", "development")
-            confirm, _ = pilot.prepare(Path(temp) / "confirm", "confirmation")
+            dev, dev_private = pilot.prepare(Path(temp) / "dev", "development")
+            confirm, confirm_private = pilot.prepare(
+                Path(temp) / "confirm", "confirmation")
         self.assertEqual(len(dev["cases"]), 29)
         self.assertEqual(len(confirm["cases"]), 17)
-        self.assertFalse({x["case_id"] for x in dev["cases"]}
-                         & {x["case_id"] for x in confirm["cases"]})
+        dev_positive = {x["case_id"] for x in dev_private["cases"]
+                        if x["kind"] == "unique_path"}
+        confirm_positive = {x["case_id"] for x in confirm_private["cases"]
+                            if x["kind"] == "unique_path"}
+        self.assertEqual(len(dev_positive), 24)
+        self.assertEqual(len(confirm_positive), 12)
+        self.assertFalse(dev_positive & confirm_positive)
+        dev_index = {x["case_id"]: x for x in dev["cases"]}
+        confirm_index = {x["case_id"]: x for x in confirm["cases"]}
+        shared = set(dev_index) & set(confirm_index)
+        self.assertEqual(shared, {
+            "control-blank", "control-four-noise-dots", "control-near-white",
+            "control-weak-distractor", "control-candidate-overflow",
+        })
+        for case_id in shared:
+            self.assertEqual(dev_index[case_id]["public_task_sha256"],
+                             confirm_index[case_id]["public_task_sha256"])
 
     def test_generated_target_uses_actual_public_pixels(self):
         for shape in ("flat", "incline", "arc", "sine"):
