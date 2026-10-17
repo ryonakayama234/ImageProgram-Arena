@@ -174,5 +174,17 @@ class CandidateReviewTests(unittest.TestCase):
         self.assertEqual(graded["counts"]["controls"], 1)
 
 
+    def test_partial_budget_bank_rejected(self):
+        _, _, pred = self.bundle
+        obs = pred["cases"][0]["observation"]
+        obs["status"] = "budget_exceeded"
+        obs["legacy_selected_candidate_id"] = None
+        obs["canonical_sha256"] = digest({k: v for k, v in obs.items()
+                                          if k != "canonical_sha256"})
+        with self.assertRaisesRegex(ValueError, "partial-budget-bank"):
+            review(self.bundle)
+
+
+
 if __name__ == "__main__":
     unittest.main()
