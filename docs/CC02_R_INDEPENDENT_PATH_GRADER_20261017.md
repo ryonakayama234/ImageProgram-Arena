@@ -1,6 +1,6 @@
 # CC-02-R / Independent ordered-visible-contour grade v0
 
-Date: 2026-10-17 JST. **Research-only scorer: synthetic contract smoke PASS; frozen 17-case independent grading NOT RUN.** Parent: [Model Issue #101](https://github.com/ryonakayama234/ImageProgram/issues/101). Separate L1 blind review: Model #109 and Arena #45.
+Date: 2026-10-17 JST. **Research-only scorer. Update: original 17-case artifacts recovered and hash-matched; separate legacy coordinate replay completed (8/12 unique path matches, one false completion). Strict v0 gate remains NOT_EVALUABLE because historical evidence is missing. Python3.12 full Arena suite: 104 PASS.** See [recovery / replay audit](CC02_R_LEGACY17_REPLAY_AUDIT_20261017.md). The ledger below preserves the first-stage state at authoring. Parent: [Model Issue #101](https://github.com/ryonakayama234/ImageProgram/issues/101). Separate L1 blind review: Model #109 and Arena #45.
 
 ## Research question
 
