@@ -93,6 +93,13 @@ def grade_run(run_dir: Path, output: Path) -> dict:
             raise ValueError("final raster identity mismatch")
         if sha_file(episode / "result.json") != record["episode_hash"]:
             raise ValueError("episode result identity mismatch")
+        decision_path = episode / "e2e_l01_decision.json"
+        if sha_file(decision_path) != record["decision_sha256"]:
+            raise ValueError("decision receipt hash mismatch")
+        decision = _read_json(decision_path)
+        if (decision["offset"] != record["offset"] or decision["arm"] != record["arm"]
+                or decision["program_hash"] != sha_file(episode / "program.json")):
+            raise ValueError("decision/program does not match actual episode")
         result = _read_json(episode / "result.json")
         if (result["status"] != "program_exhausted"
                 or result["final_state_hash"] != record["world_state_hash"]
