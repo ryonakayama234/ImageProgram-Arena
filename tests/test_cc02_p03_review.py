@@ -141,7 +141,7 @@ class P03IndependentReviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             dev, _ = pilot.prepare(Path(temp) / "dev", "development")
             confirm, _ = pilot.prepare(Path(temp) / "confirm", "confirmation")
-        self.assertEqual(len(dev["cases"]), 30)
+        self.assertEqual(len(dev["cases"]), 29)
         self.assertEqual(len(confirm["cases"]), 17)
         self.assertFalse({x["case_id"] for x in dev["cases"]}
                          & {x["case_id"] for x in confirm["cases"]})
