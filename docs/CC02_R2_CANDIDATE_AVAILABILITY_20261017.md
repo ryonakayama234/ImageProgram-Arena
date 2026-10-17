@@ -1,5 +1,8 @@
 # CC-02-R2 Arena: independent candidate presence experiment (development only)
 
+> **Execution update 2026-10-17:** Python3.12 paired DEV run completed. Candidate recall **6/8**, legacy selection accuracy among available **2/6**. Model **285/285 tests + Ruff PASS**, Arena **121/121 tests + R2 changed-file Ruff PASS**; Arena full isolated lint retains four pre-existing I001 errors. R1 remains HOLD; faint target paths absent. Source-pinned results, System/ER diagrams and next decision: [execution record](CC02_R2_EXECUTION_20261017.md). The implementation-time NOT RUN statements below are historical.
+
+
 Date: 2026-10-17 JST. Parent [Model Issue #110](https://github.com/ryonakayama234/ImageProgram/issues/110). Based on [Arena Draft #46](https://github.com/ryonakayama234/ImageProgram-Arena/pull/46). Coordinate-based **NEW 9-case developmental pilot**, not the recovered 17 historical tasks.
 
 ## Objective and separation
@@ -84,7 +87,7 @@ The independent grader does not import a hidden task factory; it reads and valid
 
 **Implemented, source-published**: 9-case new public/private generator, public-only two-phase predictor runner, standalone coordinate-based candidate scorer, 13 adversarial scorer tests and 4 DEV-fixture tests, Model-side eight candidate-observation tests, full System/ER and runbook.
 
-**NOT RUN / NOT CLAIMED:** real GitHub branch Python3.12 Model/Arena tests, Ruff, actual 9-case paired Model PREDICT followed by independent grade, experimental candidate recall, R1 optimization, confirmation geometry, Motor, Skill, old sealed confirmation, human L1 review, merging or paid CI. The older Arena #46 Python3.12 104/104 result is NOT a substitute for this PR's test status.
+**At initial publication, NOT RUN / NOT CLAIMED (see execution update):** real GitHub branch Python3.12 Model/Arena tests, Ruff, actual 9-case paired Model PREDICT followed by independent grade, experimental candidate recall, R1 optimization, confirmation geometry, Motor, Skill, old sealed confirmation, human L1 review, merging or paid CI. The older Arena #46 Python3.12 104/104 result is NOT a substitute for this PR's test status.
 
 ### Stage-gate decision
 
