@@ -105,7 +105,19 @@ def grade_run(run_dir: Path, output: Path) -> dict:
                 or result["final_state_hash"] != record["world_state_hash"]
                 or record["replay_verified"] is not True):
             raise ValueError("P1 replay/semantic identity mismatch")
-        pre = run_dir / "tasks" / task_id / "public" / "initial.png"
+        pre = episode / "frames" / "000000.png"  # part of verified P1 manifest
+        public_pre = run_dir / "tasks" / task_id / "public" / "initial.png"
+        if sha_file(public_pre) != sha_file(pre):
+            raise ValueError("public initial Canvas disagrees with P1 checkpoint")
+        observed = _read_json(run_dir / "tasks" / task_id / "public" / "observation.json")
+        p1_observation = _read_json(episode / "initial_observation.json")
+        if observed["image_hash"] != p1_observation["image_sha256"]:
+            raise ValueError("public observation image identity mismatch")
+        expected_input_hash = "sha256:" + hashlib.sha256(json.dumps(
+            observed, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode()).hexdigest()
+        if decision["public_input_hash"] != expected_input_hash:
+            raise ValueError("policy decision is not bound to public observation")
         before = np.asarray(Image.open(pre).convert("L"))
         after = np.asarray(Image.open(episode / "final.png").convert("L"))
         grade = grade_image(before, after, t)
