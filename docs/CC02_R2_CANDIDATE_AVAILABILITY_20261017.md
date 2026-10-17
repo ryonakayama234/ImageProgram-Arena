@@ -75,14 +75,14 @@ python3.12 -m adapters.imageprogram_reference.cc02_r2_candidate_review \
   --private /tmp/cc02-r2-dev/private.json --private-sha256 PRIVATE_SHA \
   --prediction /tmp/cc02-r2-dev/prediction.json --prediction-sha256 PRED_SHA \
   --out /tmp/cc02-r2-dev/grade.json
-python3.12 -m unittest tests.test_cc02_r2_candidate_review -v
+python3.12 -m unittest discover -s tests -p "test_cc02_r2_*.py" -v
 ~~~
 
 The independent grader does not import a hidden task factory; it reads and validates ONLY saved blobs. Grade output is exclusive-create and reports family-grouped rows (not a misleading single 9-trial independent accuracy claim).
 
 ## Experiment / failure ledger
 
-**Implemented, source-published**: 9-case new public/private generator, public-only two-phase predictor runner, standalone coordinate-based candidate scorer, 12 adversarial scorer tests, Model-side eight candidate-observation tests, full System/ER and runbook.
+**Implemented, source-published**: 9-case new public/private generator, public-only two-phase predictor runner, standalone coordinate-based candidate scorer, 12 adversarial scorer tests and 4 DEV-fixture tests, Model-side eight candidate-observation tests, full System/ER and runbook.
 
 **NOT RUN / NOT CLAIMED:** real GitHub branch Python3.12 Model/Arena tests, Ruff, actual 9-case paired Model PREDICT followed by independent grade, experimental candidate recall, R1 optimization, confirmation geometry, Motor, Skill, old sealed confirmation, human L1 review, merging or paid CI. The older Arena #46 Python3.12 104/104 result is NOT a substitute for this PR's test status.
 
