@@ -53,7 +53,16 @@ def grade_run(run_dir: Path, output: Path) -> dict:
     manifest = _read_json(run_dir / "manifest.json")
     if manifest["format"] != "e2e-l01-experiment-v1" or manifest["status"] != "PENDING_INDEPENDENT_ARENA_GRADE":
         raise ValueError("unsupported/unsealed model run")
-    truths = _read_json(run_dir / "private_tasks.json")
+    pinned_files = {
+        "private_source_sha256": "private/source_tasks.json",
+        "episodes_sha256": "episodes.json",
+        "train_rows_sha256": "training_public_rows.json",
+        "learned_policy_sha256": "learned_policy.json",
+    }
+    for key, name in pinned_files.items():
+        if sha_file(run_dir / name) != manifest[key]:
+            raise ValueError(f"run source evidence hash mismatch: {key}")
+    truths = _read_json(run_dir / "private" / "source_tasks.json")
     by_task = {r["task_id"]: r for r in truths}
     if len(by_task) != len(truths) or len(truths) != manifest["tasks"]:
         raise ValueError("task lineage identity mismatch")
